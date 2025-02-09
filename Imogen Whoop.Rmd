@@ -5,80 +5,88 @@ date: "26/1/24"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
+# Personal Whoop Analysis: What makes the Optimal Taper?
 
-# Introduction to Metric Analysis
+## Motivation
 
-In this workbook we are going to work through some preliminary analysis that can be done using self collected metrics.
+Taper is one of the hardest but also most important parts of the swimming cycle to execute. Years of training can come to fruition with a good taper, but swimmers often fall short if they "miss" their taper.
+
+This is an important problem to me personally as I am using my own Whoop data from my college experience (2020-2025) to decipher what are important features of taper for me and what I can optimize/avoid in order to have a "peak performance."
+
+Whilst it will be useful to see how Whoop affects taper and competition, it is important to note that this analysis is a small snapshot of my actions that affect my swimming. I am not including injury, illness, nutrition or recovery data, which would help to draw a better picture of my performance. I am, however, hoping that significant changes in these areas will be reflected in my personal metrics and thus be considered.
+
+## Previous Work
+
+There have been a number of studies on wearable tech metrics and their accuracy and predictability for factors of performance, recovery and strain. 
+
+One study I found that was particularly interesting and related to my analysis is the thesis of Emily Lundstrom, a Masters student at Penn State University called _Effectiveness of Wearable Technology for Predicting Measures of Metabolism and Performance in Collegiate Division 1 Swimmers_. She found a negative correlation between strain and time trial performance in female swimmers as well as a positive correlation between HRV and suppressed metabolic rate. These are both significant findings when looking at Whoop metrics in swimmers and are similar to what I would expect to find in my own analysis. 
 
 
+## Problem Framing
+
+After an exploratory analysis of the different data sets collected by Whoop, which include physiology, sleep and workouts, I intend to analyse different parts of this problem.
+
+1. What factors contribute the most to my peak performances?
+  For this, I will use both my own derived variables such as AC ratio, and Whoop's derived metrics to create a model that predicts performance and extract variable importance. 
+  
+  
+2. How my performance varies between events, based on taper?
+  For this, I will extract more data from my swims and look at distribution of splits and overall results for 50 vs 100 and how factors differ between good performances in front-end vs. back-end speed.
 
 
-## Preliminaries
+## Data Overview
+
+My data sources will be:
+
+Whoop metrics from July 2020 to Jan 2025
+
+  - Whoop derived variables:
+      - Physiological
+      - Sleep
+      - Workout
+      
+  - Self derived variables
+      - AC Ratios
+      - Rolling average
+      - Workout description indicator variables
+  
+swimcloud.com meet results from July 2020 to Jan 2025
+
+This data is generally pretty clean and comprehensive. I have worn my Whoop consistently for the past 4 years with only a few days missing data. I do take off my Whoop when I am competing, but this should not affect my analysis as I am using results-based data to evaluate success of a meet rather than in-meet Whoop metrics.
+
+The swimcloud website is also a reliable data source. They report times for all meets and splits for most, meaning there is no need to impute data here.
+
+## Bibliography
+
+Lundstrom, E. (2020). Effectiveness of Wearable Technology for Predicting Measures of Metabolism and Performance in Collegiate Division 1 Swimmers. Master's Thesis, Pennsylvania State University1. Retrieved from Pennsylvania State University Electronic Theses and Dissertations.
+
+## Preliminary EDA
 
 Let's load in the packages we are going to use for the analysis:
 
-```{r}
-#install.packages("ggplot2") # install ggplot2
-#install.packages("ggdark") # install ggdark
-#install.packages("data.table") # install data.table
+```{r warning=FALSE}
 library(ggplot2) # load ggplot2
 library(ggdark) # load ggdark
 library(data.table) # load data.table
 library(dplyr)
 library(lubridate)
 library(tidyr)
+library(stringr)
 ```
-
-
-
-
-
-
-Let's load some data to look at:
-
-```{r}
-phys_cycles <- read.csv("physiological_cycles.csv")
-head(phys_cycles)
-```
-
-
-## Preliminary Data Investigation
-
-Before we start graphing the dataset, let's check the data quality by viewing the first few rows of the data, `head()`, the last few rows of the data, `tail()`, the dimensions of the data set, `dim()`, and a summary of the data, `summary()`.
-
-
-```{r}
-head(metric_data) # View first few rows of data
-```
-
-Here we see the morning metrics are complete during the first few rows but the evening metrics and others are not well recorded intially. 
-
-
-```{r}
-tail(metric_data) # View last few rows of the data
-```
-
-For the last few rows the metrics are present except for productivity, which is missing likely due to time off. 
 
 
 
 ```{r}
+phys_cycles <- read.csv("physiological_cycles.csv")
 dim(phys_cycles) # View dimensions of the data
+plot_data <- phys_cycles 
+colnames(plot_data) <- c("cycle_start", "cycle_end", "cycle_tzone", "recovery", "rhr", "hrv", "skin_temp", "blood_oxygen", "day_strain", "energy_burned", "maxhr", "ahr", "sleep_onset", "wake_onset", "sleep_performance", "resp_rate", "asleep_dur", "in_bed_dur", "light_sleep", "deep_sleep", "rem", "awake_dur", "sleep_need", "sleep_debt", "sleep_efficiency", "sleep_consistency")
+
+summary(plot_data) # Summarise metric data
 ```
-
-We see there are 366 rows in the data corresponding to the year of 2020 and 11 columns of data. 
-
-
+This data has 1477 rows dating from July 2020 to present. It includes general data on physiological cycles including sleep and  daily metrics.
 ```{r}
-summary(phys_cycles) # Summarise metric data
-unique(phys_cycles$Cycle.timezone)
 
-plot_data <- phys_cycles %>% select(Cycle.start.time, Cycle.timezone, Recovery.score.., Resting.heart.rate..bpm., Heart.rate.variability..ms., Average.HR..bpm.)
-
-colnames(plot_data) <- c("cycle_start", "cycle_tzone", "recovery", "rhr", "hrv", "ahr")
 
 # Create a mapping of time zone offsets to Olson names
 tzone_mapping <- c(
@@ -95,14 +103,14 @@ plot_data <- plot_data %>%
   mutate(cycle_olson = tzone_mapping[cycle_tzone])
 
 # Convert cycle_start to POSIXct
-plot_data <- plot_data %>%
-  mutate(cycle_start = ymd_hms(cycle_start))
+plot_data <- plot_data %>% rowwise() %>%
+  mutate(cycle_start = ymd_hms(cycle_start, tz = cycle_olson),
+         cycle_end = ymd_hms(cycle_end, tz = cycle_olson),
+         wake_onset = ymd_hms(wake_onset, tz = cycle_olson),
+         sleep_onset = ymd_hms(sleep_onset, tz = cycle_olson),) %>% ungroup()
 
-# Apply the with_tz() function
-plot_data <- plot_data %>%
-  mutate(cycle_converted = mapply(with_tz, cycle_start, cycle_olson)) %>% mutate(cycle_converted = mapply(as_datetime))
 
-plot_data$cycle_converted = as_datetime(plot_data$cycle_converted)
+
 
 
 #grade mapping
@@ -123,10 +131,11 @@ grade_mapping <- function(date) {
   }
 }
 
+plot_data <- plot_data %>% filter(!is.na(cycle_start) & !is.na(cycle_end) & !is.na(wake_onset))
 
 
 # Apply the function to the data frame
-plot_data <-  plot_data %>% mutate(grade = sapply(cycle_converted, grade_mapping))
+plot_data <-  plot_data %>% mutate(grade = sapply(wake_onset, grade_mapping))
 summary(plot_data)
 
 days_since_mapping <- function(grade, date) {
@@ -155,41 +164,19 @@ days_since_mapping <- function(grade, date) {
 
 
 # Apply the function to the data frame
-plot_data <-  plot_data %>% mutate(days_since = mapply(days_since_mapping, grade, cycle_converted))
-summary(plot_data)
+plot_data <-  plot_data %>% mutate(days_since = mapply(days_since_mapping, grade, wake_onset))
 
-melted_data <- plot_data %>% select(-c(cycle_start, cycle_tzone, cycle_olson)) %>% pivot_longer(cols = -c(cycle_converted, grade, days_since), names_to = "metric", values_to= "value")
+melted_data <- plot_data %>% select(-c(cycle_start, cycle_end, cycle_tzone, cycle_olson, sleep_onset )) %>% pivot_longer(cols = -c(wake_onset, grade, days_since), names_to = "metric", values_to= "value")
 
 ```
 
+## Physiological Metrics over Years
+
 ```{r}
-# Create plot
 
-g_1 <- ggplot(melted_data, # Set data
-              aes(x = cycle_converted, y = value, color = metric))+ # Set aesthetics
-  #geom_jitter(alpha = 0.2, height =0.1, aes(fill = metric))+ # Add points 
-    geom_vline(data = melted_data[melted_data$value <= 10 & melted_data$metric == "recovery", ], aes(xintercept = cycle_converted), linetype = "dotted", color = "blue") +
-  geom_smooth(se = FALSE) + # Add smooting line
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + # Turn off grid
-  dark_theme_minimal() + # Set theme
-  labs(title = "Whoop Metrics", # Set labels
-       color = "Metric") + facet_wrap(~grade)+
-  guides(fill = "none") 
+metric_plot <- melted_data %>% mutate(reference = ifelse(month(wake_onset) == 8, "pre season", ifelse(month(wake_onset) %in% c(5,6,7), "summer", ifelse(month(wake_onset) == 2, "conference", NA))))
 
-# Generate plot
-g_1
-# Turn off dark mode
-invert_geom_defaults()
-```
-```{r}
-#sickness- dec 3rd for 3 weeks
-hrv_plot <- melted_data[melted_data$metric == "recovery",] %>% na.omit()
-
-metric_plot <- melted_data %>% mutate(reference = ifelse(month(cycle_converted) == 8, "pre season", ifelse(month(cycle_converted) %in% c(5,6,7), "summer", ifelse(month(cycle_converted) == 2, "conference", NA))))
-
-summary(metric_plot)
-
-metrics = c("rhr", "hrv", "ahr", "recovery")
+metrics = c("rhr", "hrv", "maxhr", "recovery")
 for (i in 1:4){
   g_metric <- ggplot(metric_plot[metric_plot$metric == metrics[i],], # Set data
               aes(x = days_since, y = value, color = grade))+ # Set aesthetics
@@ -218,354 +205,393 @@ invert_geom_defaults()
 ```
 
 
-
-We see there are much much more missing values for several of the metrics than others, these are generally the evening metrics.
-
-Data Context:
-
-Missing values either represent being too busy to record metrics or a time on holidays. This highlights the importance of having context around the data to know which is which when trying to interpret it. 
-
-
-## Data Time Line
-
-Next let's look at the data over time and see what we can find in the data. First we need to melt the data to long form:
+## Meet Overview
 
 ```{r}
-# Melt data
-plot_dat <- melt(metric_data[, !names(metric_data) %in% c("Sleep_Hours")], id.vars = c("Date", "Day"))
+all_swim <- read.csv("all_swim_results.csv")
+
 ```
 
-We now want to plot this out. Since there are only five potential values for the data to take, we will use `geom_jitter` to spread the points at each level out. 
+```{r}
+swim_df <- all_swim %>% mutate(Date = str_replace_all(Date, "–\\d{1,2}", ""), Results = str_replace_all(Results, "\\[|'|\\]|%|\\+", "")) %>% 
+  mutate(Date = mdy(Date)) %>% 
+    separate(Results, into = c("1", "2", "3"), sep = "\\), \\(", remove = TRUE) %>% 
+      pivot_longer(cols = c("1", "2", "3"), names_to = "Event_Num", values_to = "Results")  %>% 
+        mutate(Results = str_replace_all(Results, "\\(|\\)", "")) %>% 
+          separate(Results, into = c("Event", "Time", "Season_Improvement"), sep=",") %>%
+          mutate(Time = trimws(Time), Season_Improvement = trimws(Season_Improvement))  %>% 
+            mutate(Season_Improvement = as.numeric(Season_Improvement))
+
+imputed <- swim_df %>% mutate(Time = ifelse(Time == "", NA, Time), Event = ifelse(Event == "", NA, Event)) %>% mutate(Season_Improvement = ifelse(!is.na(Time) & is.na(Season_Improvement), 0, Season_Improvement))
+
+head(imputed)
+plot_bar <- imputed %>% filter(!is.na(Event)) %>% mutate(Best = ifelse(Event %in% c("100 Y Free", "50 Y Free", "100 Y Back"), 1, 0))
+ggplot(data = plot_bar, aes(x=as.factor(Event), fill = as.factor(Best))) + 
+  geom_bar() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  guides(fill = "none") +
+  labs(title = "Distribution of Events in College", subtitle = "2020-2025", x ="events")
+```
 
 ```{r}
-# Create plot
-g_1 <- ggplot(plot_dat, # Set data
-              aes(x = Date, y = value, color = variable))+ # Set aesthetics
-  geom_jitter(alpha = 0.2, height =0.1, aes(fill = variable))+ # Add points
+
+summary_imp <- imputed %>% group_by(Date) %>% summarise(mean_imp = mean(Season_Improvement, rm.na = TRUE), max_imp = max(Season_Improvement, rm.na = TRUE)) %>% na.omit()
+
+#get week summary for improvement so we can match it with weekly sleep and strain
+summary_week <- summary_imp %>%
+  mutate(week = floor_date(Date, "week")) %>%
+  group_by(week) %>%
+  summarise(mean_imp = mean(mean_imp),
+            max_imp = max(max_imp))
+
+summary_week$week = as.POSIXct.Date(summary_week$week)
+
+
+```
+
+## Sleep Metrics over the Years
+
+```{r}
+sleep = read.csv("sleeps.csv")
+colnames(sleep) = c("cycle_start", "cycle_end", "cycle_tzone", "sleep_onset", "wake_onset", "performance", "resp_rate", "asleep_dur", "in_bed_dur", "light_sleep", "deep_sleep", "rem", "awake", "sleep_need", "sleep_debt", "efficiency", "consistency", "nap")
+
+sleep_data <- sleep %>%
+  mutate(cycle_olson = tzone_mapping[cycle_tzone])
+
+# Convert cycle_start to POSIXct
+sleep_data <- sleep_data %>%
+  rowwise() %>%
+  mutate(cycle_start = ymd_hms(cycle_start, tz = cycle_olson)) %>% 
+  mutate(cycle_end = ymd_hms(cycle_end, tz = cycle_olson)) %>%
+  mutate(sleep_onset = ymd_hms(sleep_onset, tz = cycle_olson)) %>% 
+  mutate(wake_onset = ymd_hms(wake_onset, tz = cycle_olson)) %>% ungroup()
+
+
+sleep_data <- sleep_data %>% select(-c(cycle_start, cycle_end, sleep_onset, cycle_tzone, cycle_olson))
+
+sleep_data <-  sleep_data %>% filter(wake_onset >= as.Date("2020-08-01")) %>% mutate(grade = sapply(wake_onset, grade_mapping))
+
+# Apply the function to the data frame
+sleep_data <-  sleep_data %>% mutate(days_since = mapply(days_since_mapping, grade, wake_onset)) %>% select(-nap)
+
+melted_data <- sleep_data %>% pivot_longer(cols = -c(wake_onset, grade, days_since), names_to = "metric", values_to= "value")
+
+```
+
+
+```{r}
+
+metric_plot <- melted_data %>% mutate(reference = ifelse(month(wake_onset) == 8, "pre season", ifelse(month(wake_onset) %in% c(5,6,7), "summer", ifelse(month(wake_onset) == 2, "conference", NA))))
+
+summary(metric_plot)
+
+metrics = c("efficiency", "performance", "sleep_debt", "rem")
+for (i in 1:4){
+  g_metric <- ggplot(metric_plot[metric_plot$metric == metrics[i],], # Set data
+              aes(x = days_since, y = value, color = grade))+ # Set aesthetics
+  #geom_jitter(alpha = 0.2, height =0.1, aes(fill = metric))+ # Add points 
+    
+  geom_vline(xintercept = metric_plot[metric_plot$reference == "pre season",]$days_since, linetype = "dotted", color = "blue") + # Add vertical reference line
+    
+  geom_vline(xintercept = metric_plot[metric_plot$reference == "conference",]$days_since, linetype = "dotted", color = "green") + # Add vertical reference line
+    
   geom_smooth(se = FALSE) + # Add smooting line
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + # Turn off grid
   dark_theme_minimal() + # Set theme
-  labs(title = "Metrics - 2020", # Set labels
-       color = "Metric") +
-  guides(fill = "none")
+  labs(title = paste0("Whoop Metrics -- ", metrics[i]), # Set labels
+       color = "Year") +
+      annotate("text", x = 110, y = max(metric_plot[metric_plot$metric == metrics[i] & !is.na(metric_plot$value),]$value) -5, label = "pre season", color = "blue") + # Label for vertical line
+    annotate("text", x = 290, y = max(metric_plot[metric_plot$metric == metrics[i] & !is.na(metric_plot$value),]$value) -5, label = "conference", color = "green") + # Label for vertical line
+  guides(fill = "none") 
 
 # Generate plot
-g_1
+print(g_metric)
+
+}
 # Turn off dark mode
 invert_geom_defaults()
 ```
-
-From the initial timeline we can see in general the metrics were at low values to start the year, rose in the middle, fell again later in the year and finally increased towards the end of the year. 
-
-Again, for personal metrics, the context for the metrics is key. So let's add in some events to the graph. 
-
-First let's extract the dates from the data and view them:
+## Sleep on Performance
 ```{r}
-# Extract unique dates
-date_vec <- unique(metric_data$Date)
-# View dates
-date_vec
+
+### Sleep
+
+plot_sleep = melted_data %>%  filter(metric %in% c("asleep_dur", "rem", "deep_sleep")) %>% mutate(week = floor_date(wake_onset, "week")) %>%
+  group_by(week, metric) %>%
+  summarise(mean = mean(value, na.rm = TRUE))
+
+plot_sleep$week = as.Date(plot_sleep$week)
+summary_week$week = as.Date(summary_week$week)
+
+merged = merge(summary_week, plot_sleep, by = "week")
+
+g_sleep1 = ggplot(merged, # Set data
+              aes(y = mean, x = max_imp, color = metric)) + geom_smooth() +
+  labs(x=" Max Performance Improvement %", y="Metric Mean (mins)", title = "The effect of sleep on max performance improvement") # Set aesthetics
+
+g_sleep2 = ggplot(merged, # Set data
+              aes(y = mean, x = mean_imp, color = metric)) + geom_smooth() +
+  labs(x="Mean Performance Improvement %", y="Metric Mean (mins)", title = "The effect of sleep on mean performance improvement") # Set aesthetics
+g_sleep1
+g_sleep2
+```
+At the highest values of deep and REM sleep, performance either increased the most or decreased the most. This could be explained by the fact more sleep has a positive effect of performance but also more sleep can indicate some other underlying problem such as sickness or fatigue. 
+
+## Strain on Performance
+
+```{r}
+### Strain
+strain_week = plot_data %>% select(wake_onset, day_strain) %>% mutate(week =floor_date(wake_onset, "week")) %>%
+  group_by(week) %>%
+  summarise(strain_mean = mean(day_strain, na.rm = TRUE))
+
+strain_week$week = as.Date(strain_week$week)
+merged1 = merge(summary_week, strain_week,  by = "week")
+
+colnames(strain_week)
+g_strain1 = ggplot(merged1, # Set data
+              aes(y = strain_mean, x = mean_imp)) + geom_smooth() +
+  labs(x="MeanPerformance Improvement %", y= "Mean Day Strain", title = "The effect of strain on mean performance improvement") # Set aesthetics
+g_strain1
+
+g_strain2 = ggplot(merged1, # Set data
+              aes(y = strain_mean, x = max_imp)) + geom_smooth() +
+  labs(x="Max Performance Improvement %", y= "Mean Day Strain", title = "The effect of strain on max performance improvement") # Set aesthetics
+g_strain2
+
+```
+Interestingly, there is not a linear relationship between strain and % improvement. It shows that a mean daily strain in the week leading up to my best overall performances (mean) is not the least but a little above, meaning I still kept some intensity in my workouts.
+
+When we look at max performance improvement, which is looking at when I do the best in my best event compared to the season, for improvements 3% or better the strain in consistently around 14. But if the week strain is too low (around 11) or too high (around 15.5), then my best improvement drops off.
+
+
+
+## Pre-Competition Workouts
+```{r}
+conference_dates = c(
+  "Freshman" = "02-25-2021", 
+  "Sophomore" = "02-22-2022",
+  "Junior" = "02-13-2023",
+  "Senior" = "02-22-2024")
+
+midseason_dates = c(
+  "Freshman" = "11-20-2020", 
+  "Sophomore" = "11-20-2021", 
+  "Junior" = "11-17-2022",
+  "Senior" = "11-16-2023",
+  "Grad" = "11-21-2024")
+
+
+workouts = read.csv("workouts.csv")
+workouts = workouts[,c(1:16)]
+colnames(workouts) = c("cycle_start", "cycle_end", "cycle_tzone", "workout_start", "workout_end", "dur", "activity", "activity_strain", "cals", "max_hr", "av_hr", "zone1", "zone2", "zone3", "zone4", "zone5")
+
+workouts$date = as.Date(workouts$workout_start)
+
+workouts = workouts %>% select(-c(cycle_start, cycle_end, cycle_tzone, cals, max_hr, av_hr)) %>% mutate(workout_start = ymd_hms(workout_start), workout_end = ymd_hms(workout_end)) %>%
+    mutate(morning = ifelse(format(workout_start, "%H:%M:%S") < "12:00:00", 1, 0))
+
+sessions <- workouts %>%
+  select(morning, activity, date, dur, activity_strain) %>% 
+  group_by(date) %>%
+  summarise(
+    total_dur = sum(dur),
+    max_strain = max(activity_strain),
+    count_morning = sum(morning == 1),
+    count_afternoon = sum(morning == 0)
+  )
+
+activities = workouts %>%
+  group_by(date, activity) %>%
+  summarise(count = n()) %>%
+  ungroup() %>%   pivot_wider(names_from = activity, values_from = count, values_fill = list(count = 0))  %>%
+  rename_at(vars(-date), ~ paste0(., "_count")) %>% select(date, Swimming_count, Weightlifting_count, Activity_count)
+ 
+workout_data = merge(activities, sessions, by ="date")
+workout_data$date = as.POSIXct(workout_data$date)
+workout_data <-  workout_data %>% mutate(grade = sapply(date, grade_mapping)) %>% na.omit()
+
+
+pre_meet = workout_data %>% mutate(conf_date = mdy(conference_dates[grade]), midseason_date = mdy(midseason_dates[grade])) %>% filter(conf_date-21  <= date & date <= conf_date | (midseason_date-21  <= date & date <= midseason_date)) %>% 
+  mutate(days_til1 = (as.numeric(difftime(conf_date, date, units = "days"))))%>% 
+  mutate(days_til2 = (as.numeric(difftime(midseason_date, date, units = "days")))) %>% 
+  rowwise() %>% mutate(days_til = ifelse(days_til2 >= 0, min(days_til2, days_til1), max(days_til2, days_til1))) %>% ungroup() %>% select(-days_til1, -days_til2) %>% mutate(event =ifelse( abs(difftime(conf_date, date)) > abs(difftime(midseason_date, date)),  "conference", "midseason"))
+
+ 
 ```
 
-
-Now that we know the row locations of each date, let's add in some events:
-
-* 1 - March 2nd - Visit Irish Universities with Notre Dame (Row 62)
-* 2 - March 18th - Lockdown (Row 78)
-* 3 - June 11th - Left Job (Row 163)
-* 4 - July 18th - Flew to Toronto (Row 200)
-* 5 - August 10th - Start of Semester (Row 223)
-* 6 - September 29th - Start of Mod 2 (Row 273)
-* 7 - November 24th - End of Semester (Row 329)
-* 8 - December 26th - Trip to Boston (Row 361)
-
-
 ```{r}
-# Create plot
-g_2 <- ggplot(plot_dat, # Set data
-              aes(x = Date, y = value, color = variable))+ # Set aesthetics
-  geom_jitter(alpha = 0.4, height =0.1, aes(fill = variable))+ # Add points
-  geom_smooth(se = FALSE) + # Add smoothing line
+
+metrics = c("max_strain", "total_dur")
+
+  pre_plot = pre_meet %>% select(days_til, max_strain, total_dur, event, grade) %>% pivot_longer(cols = -c(days_til, event, grade), names_to = "metric", values_to = "value") 
+  
+  g_preconf <- ggplot(pre_plot[pre_plot$metric == metrics[1] & pre_plot$event == "conference",], # Set data
+              aes(x = days_til, y = value, color = grade) )+ # Set aesthetics
+
+    
+  geom_smooth(se = FALSE) + # Add smooting line
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + # Turn off grid
   dark_theme_minimal() + # Set theme
-  labs(title = "Metrics - 2020", # Add labels
-       color = "Metric") +
-  guides(fill = "none") +
-  geom_vline(xintercept = date_vec[62], color = "gold") + # Add line for event
-  geom_text(aes(x = date_vec[50], y =4.5 , label = "ND\nVisit"), color = "gold") + # Add label for event
-  geom_vline(xintercept = date_vec[78], color = "blue") + # Add line for event
-  geom_text(aes(x = date_vec[90], y =1.5 , label = "Lockdown"), color = "blue") + # Add label for event
-  geom_vline(xintercept = date_vec[163], color = "Yellow") + # Add line for event
-  geom_text(aes(x = date_vec[168], y =0.5 , label = "Left Job"), color = "Yellow") + # Add label for event
-  geom_vline(xintercept = date_vec[200], color = "red") + # Add line for event
-  geom_text(aes(x = date_vec[205], y =1.5 , label = "Toronto"), color = "red") + # Add label for event
-  geom_vline(xintercept = date_vec[223], color = "gold") + # Add line for event
-  geom_text(aes(x = date_vec[223], y =4.5 , label = "Semester\nStart"), color = "gold") + # Add label for event
-  geom_vline(xintercept = date_vec[273], color = "Blue") + # Add line for event
-  geom_text(aes(x = date_vec[278], y =1.5 , label = "Mod 2"), color = "Blue") + # Add label for event
-  geom_vline(xintercept = date_vec[329], color = "gold") + # Add line for event
-  geom_text(aes(x = date_vec[335], y =4.5 , label = "Semester\nEnd"), color = "gold")  + # Add label for event
-  geom_vline(xintercept = date_vec[361], color = "Purple") + # Add line for event
-  geom_text(aes(x = date_vec[365], y =3.5 , label = "Boston"), color = "Purple") # Add label for event
-  
+  labs(title = "Whoop Metrics -- Pre Conference", subtitle = metrics[1], # Set labels
+       color = "Year", "Max Whoop Strain per Day") +
+  scale_x_reverse()
+
 # Generate plot
-g_2
-# Turn off dark mode
-invert_geom_defaults()
-```
+print(g_preconf)
+  
+  g_preconf1 <- ggplot(pre_plot[pre_plot$metric == metrics[2] & pre_plot$event == "conference",], # Set data
+              aes(x = days_til, y = value, color = grade) )+ # Set aesthetics
 
-
-Here see a pretty steady increase in all metrics during the lockdown phase of the year, a decline during the semester and a rise again towards the end of the year. 
-
-Let's look at some individual metrics since the chart above is quite busy:
-
-
-```{r}
-# Create plot
-g_3 <- ggplot(plot_dat[plot_dat$variable == "Productivity",], # Set data
-              aes(x = Date, y = value))+ # Set aesthetics
-  geom_jitter(alpha = 0.4, height =0.1,  color = "blue")+ # Add points
-  geom_smooth(se = FALSE, color = "yellow") + # Add smoothing line
+    
+  geom_smooth(se = FALSE) + # Add smooting line
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + # Turn off grid
   dark_theme_minimal() + # Set theme
-  labs(title = "Productivity - 2020") + # Add labels
-  guides(fill = "none") +
-  geom_vline(xintercept = date_vec[62], color = "gold") + # Add line for event
-  geom_text(aes(x = date_vec[50], y =4.5 , label = "ND\nVisit"), color = "gold") + # Add label for event
-  geom_vline(xintercept = date_vec[78], color = "blue") + # Add line for event
-  geom_text(aes(x = date_vec[90], y =1.5 , label = "Lockdown"), color = "blue") + # Add label for event
-  geom_vline(xintercept = date_vec[163], color = "Yellow") + # Add line for event
-  geom_text(aes(x = date_vec[168], y =0.5 , label = "Left Job"), color = "Yellow") + # Add label for event
-  geom_vline(xintercept = date_vec[200], color = "red") + # Add line for event
-  geom_text(aes(x = date_vec[205], y =1.5 , label = "Toronto"), color = "red") + # Add label for event
-  geom_vline(xintercept = date_vec[223], color = "gold") + # Add line for event
-  geom_text(aes(x = date_vec[223], y =4.5 , label = "Semester\nStart"), color = "gold") + # Add label for event
-  geom_vline(xintercept = date_vec[273], color = "Blue") + # Add line for event
-  geom_text(aes(x = date_vec[278], y =1.5 , label = "Mod 2"), color = "Blue") + # Add label for event
-  geom_vline(xintercept = date_vec[329], color = "gold") + # Add line for event
-  geom_text(aes(x = date_vec[335], y =4.5 , label = "Semester\nEnd"), color = "gold")  + # Add label for event
-  geom_vline(xintercept = date_vec[361], color = "Purple") + # Add line for event
-  geom_text(aes(x = date_vec[365], y =3.5 , label = "Boston"), color = "Purple") # Add label for event
-  
+  labs(title = "Whoop Metrics -- Pre Conference", subtitle = metrics[2], # Set labels
+       color = "Year", y = "Mins per Day")+
+  scale_x_reverse()
+
 # Generate plot
-g_3
-# Turn off dark mode
-invert_geom_defaults()
+print(g_preconf1)
 ```
-
-
-We see here that productivity was not being recorded prior to lockdown, remained fairly constant from then on, until towards the end of the semester. Notably in mod 2, there were no days where productivity was at a 5 after the start of the module. 
-
-Let's look at another metric:
+This shows how many workouts changed when approaching two major meets this year. My most successful year, Senior year, I kept at least one of my practices with high intensity and dropped that intensity dramatically with around a week to go. There was a similar pattern with total workout duration per day, but the drop happened early around 10 days previous.
 
 ```{r}
-# Create plot
-g_4 <- ggplot(plot_dat[plot_dat$variable == "Wake_Up",], # Set data
-              aes(x = Date, y = value))+ # Set aesthetics
-  geom_jitter(alpha = 0.4, height =0.1,  color = "blue")+ # Add points
-  geom_smooth(se = FALSE, color = "yellow") + # Add smoothing line
+  g_premid <- ggplot(pre_plot[pre_plot$metric == metrics[1] & pre_plot$event == "midseason",], # Set data
+              aes(x = days_til, y = value, color = grade) )+ # Set aesthetics
+
+    
+  geom_smooth(se = FALSE) + # Add smooting line
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + # Turn off grid
   dark_theme_minimal() + # Set theme
-  labs(title = "Wake Up - 2020") + # Add labels
-  geom_vline(xintercept = date_vec[62], color = "gold") + # Add line for event
-  geom_text(aes(x = date_vec[50], y =4.5 , label = "ND\nVisit"), color = "gold") + # Add label for event
-  geom_vline(xintercept = date_vec[78], color = "blue") + # Add line for event
-  geom_text(aes(x = date_vec[90], y =1.5 , label = "Lockdown"), color = "blue") + # Add label for event
-  geom_vline(xintercept = date_vec[163], color = "Yellow") + # Add line for event
-  geom_text(aes(x = date_vec[168], y =0.5 , label = "Left Job"), color = "Yellow") + # Add label for event
-  geom_vline(xintercept = date_vec[200], color = "red") + # Add line for event
-  geom_text(aes(x = date_vec[205], y =1.5 , label = "Toronto"), color = "red") + # Add label for event
-  geom_vline(xintercept = date_vec[223], color = "gold") + # Add line for event
-  geom_text(aes(x = date_vec[223], y =4.5 , label = "Semester\nStart"), color = "gold") + # Add label for event
-  geom_vline(xintercept = date_vec[273], color = "Blue") + # Add line for event
-  geom_text(aes(x = date_vec[278], y =1.5 , label = "Mod 2"), color = "Blue") + # Add label for event
-  geom_vline(xintercept = date_vec[329], color = "gold") + # Add line for event
-  geom_text(aes(x = date_vec[335], y =4.5 , label = "Semester\nEnd"), color = "gold")  + # Add label for event
-  geom_vline(xintercept = date_vec[361], color = "Purple") + # Add line for event
-  geom_text(aes(x = date_vec[365], y =3.5 , label = "Boston"), color = "Purple") # Add label for event
-  
+  labs(title = "Whoop Metrics -- Pre Mid", subtitle = metrics[1], # Set labels
+       color = "Year", "Max Whoop Strain per Day")+
+  scale_x_reverse()
+
 # Generate plot
-g_4
-# Turn off dark mode
-invert_geom_defaults()
-```
+print(g_premid)
 
 
-Here we see this was hitting pretty poor values prior to lockdown, improved over the summer and declined slightly during the semester. 
+  
+  g_premid1 <- ggplot(pre_plot[pre_plot$metric == metrics[2] & pre_plot$event == "midseason",], # Set data
+              aes(x = days_til, y = value, color = grade) )+ # Set aesthetics
 
-Let's contrast this with sleep hours:
-
-```{r}
-# Create plot
-g_5 <- ggplot(metric_data, # Set data
-              aes(x = Date, y = Sleep_Hours))+ # Set aesthetics
-  geom_jitter(alpha = 0.4, height =0.1,  color = "blue")+ # Add points
-  geom_smooth(se = FALSE, color = "yellow") + # Add smoothing line
+    
+  geom_smooth(se = FALSE) + # Add smooting line
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + # Turn off grid
   dark_theme_minimal() + # Set theme
-  labs(title = "Sleep Hours - 2020") + # Add labels
-  geom_vline(xintercept = date_vec[62], color = "gold") + # Add line for event
-  geom_text(aes(x = date_vec[50], y =4.5 , label = "ND\nVisit"), color = "gold") + # Add label for event
-  geom_vline(xintercept = date_vec[78], color = "blue") + # Add line for event
-  geom_text(aes(x = date_vec[90], y =1.5 , label = "Lockdown"), color = "blue") + # Add label for event
-  geom_vline(xintercept = date_vec[163], color = "Yellow") + # Add line for event
-  geom_text(aes(x = date_vec[168], y =0.5 , label = "Left Job"), color = "Yellow") + # Add label for event
-  geom_vline(xintercept = date_vec[200], color = "red") + # Add line for event
-  geom_text(aes(x = date_vec[205], y =1.5 , label = "Toronto"), color = "red") + # Add label for event
-  geom_vline(xintercept = date_vec[223], color = "gold") + # Add line for event
-  geom_text(aes(x = date_vec[223], y =4.5 , label = "Semester\nStart"), color = "gold") + # Add label for event
-  geom_vline(xintercept = date_vec[273], color = "Blue") + # Add line for event
-  geom_text(aes(x = date_vec[278], y =1.5 , label = "Mod 2"), color = "Blue") + # Add label for event
-  geom_vline(xintercept = date_vec[329], color = "gold") + # Add line for event
-  geom_text(aes(x = date_vec[335], y =4.5 , label = "Semester\nEnd"), color = "gold")  + # Add label for event
-  geom_vline(xintercept = date_vec[361], color = "Purple") + # Add line for event
-  geom_text(aes(x = date_vec[365], y =3.5 , label = "Boston"), color = "Purple") # Add label for event
+  labs(title = "Whoop Metrics -- Pre Mid", subtitle = metrics[2], # Set labels
+       color = "Year", y = "Mins per Day")+
+  scale_x_reverse()
+
+# Generate plot
+print(g_premid1)
+
+```
+There is a lot less significant pattern approaching mid-season as there is less emphasis on resting for this meet. Interesting my best two years, junior and senior, had completely different approaches to taper.
+
+## EDA Findings
+
+Based on my EDA and my knowledge of how I have swam over the years, there are certain factors that seem to affect my performance. I will use these derived variables for the time leading into meets
+
+**From the sleep metrics:**
+- REM sleep (week before)
+- Deep sleep (week before)
+- Sleep efficiency (week before)
+
+**From workout metrics:**
+- mean daily workout duration (2 weeks before)
+  - swims
+  - mornings
+- mean daily strain (2 weeks before)
+- max daily workout strain (2 weeks before)
+- A:C ratio for each aerobic zone (7:28)
+
+**From physiology metrics:**
+- mean max daily HR
+- mean RHR
+- mean HRV
+
+
+
+
+
+```{r Get top 5 event results as output for model}
+library(readxl)
+top5 <- read_excel("swim_top5.xlsx") %>%
+  group_by(Date, Event) %>%
+  mutate(SwimNum = dense_rank(desc(row_number()))) 
+
+back2 <- read.delim("./back2.txt", comment.char="#")
+
+back2 <- back2 %>% select(-X) %>% separate(Time, into = c("Min", "Sec"), sep = ":") %>% mutate(Time = as.numeric(Min)*60 + as.numeric(Sec), Event = "200 Y Back", Date = mdy(Date)) %>% select(-Min, -Sec) %>% 
+  group_by(Date, Event) %>%
+  mutate(SwimNum = dense_rank(desc(row_number()))) 
+
+top5 <- rbind(top5, back2)
+
+top5 %>% ungroup()
+top5 <- top5  %>% group_by(Event) %>% arrange(Event, Date, SwimNum)
+pb = 1000
+pb_col = c() 
+imp_col = c()
+prev_event = ""
+
+for (i in 1:nrow(top5)) {
+  row <- top5[i, ]
+  event = row$Event
   
-# Generate plot
-g_5
-# Turn off dark mode
-invert_geom_defaults()
+  if (event == prev_event & row$Time <= pb){
+      pb_col = c(pb_col, 1)
+      
+      imp = -(top5[i, ]$Time - pb)/top5[i, ]$Time
+      
+      imp_col = c(imp_col, imp)
+      
+      pb = top5[i, ]$Time
+  } else if(event != prev_event){ #first time swam new event
+    
+      pb_col = c(pb_col, 1)
+      imp_col = c(imp_col, 0)
+      pb = top5[i, ]$Time
+  } else {
+      pb_col = c(pb_col, 0)
+      imp = -(top5[i, ]$Time - pb)/top5[i, ]$Time
+      imp_col = c(imp_col, imp)
+
+  }
+  
+  prev_event = row$Event
+  
+  
+}
+top5$PB = pb_col
+top5$Imp= imp_col
+head(top5)
 ```
+To do:
+- derive ac ratios for all zones, strains
+- derive lags for all sleep
+- count number of workouts, mornings in lag
+- run models for all and individual events
 
-Here see this was not recorded prior to the start of lockdown. It was pretty good during the summer with a couple of outliers while traveling. 
+- cluster performances by metrics do any performances stand out?
+- lasso correlation between imp and anything?
 
-## Investigating Relationships
 
-Let's look at the relationship between productivity and sleep hours:
+
+
 
 ```{r}
-# Create plot
-g_6 <- ggplot(metric_data, # Set data
-              aes(x = Sleep_Hours, y = Productivity)) + # Set aesthetics
-  geom_jitter(color = "blue", alpha = 0.4, height =0.1) + # Add point
-  geom_smooth(color = "yellow") + # Add smoothing line
-   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + # Turn off grid
-  dark_theme_minimal() + # Set theme
-  labs(title = "Sleep Hours vs Productivity - 2020") # Add labels
 
-# Generate plot
-g_6
-# Turn off dark mode
-invert_geom_defaults()
 ```
 
-Here it looks like productivity was optimised with between 7 to 9 hours sleep. 
 
-Since hours of sleep does not tell the full story, let's look at the relationship between wake up and productivity
 
-```{r}
-# Create plot
-g_7 <- ggplot(metric_data, # Set data
-              aes(x = Wake_Up, y = Productivity)) + # Set aesthetics
-  geom_jitter(color = "blue", alpha = 0.4, height =0.1) + # Add point
-  geom_smooth(color = "yellow") + # Add smoothing line
-   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + # Turn off grid
-  dark_theme_minimal() + # Set theme
-  labs(title = "Wake Up vs Productivity - 2020") # Add labels
 
-# Generate plot
-g_7
-# Turn off dark mode
-invert_geom_defaults()
-```
 
-Here we see a much more positive relationship where a higher wake up quality leads to a more productive day. 
+## Next Ideas: 
 
-## Day of Week Analysis
-
-We can also look at metrics for different days of the week. 
-
-Let's first look at sleep hours by the day of the week. To get this to have the correct order when we plot it out, we need to convert day into a factor and set the ordering of the levels:
-
-```{r}
-# Convert days to factor and manually set levels
-metric_data$Day <- factor(metric_data$Day, levels = c("Monday", "Tuesday", "Wednesday",
-                                                      "Thursday", "Friday", "Saturday",
-                                                      "Sunday"))
-```
-
-Now we can plot this out and it will display the days of the week in order
-
-```{r}
-# Create plot
-g_8 <- ggplot(metric_data,  # Set data set
-              aes(x = Day, y = Sleep_Hours, fill = Day)) + # Set aesthetics
-  geom_boxplot(alpha = 0.5) +
-   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + # Turn off grid
-  dark_theme_minimal() + # Set theme
-  labs(title = "Sleep Hours by Day - 2020") # Add labels
-
-# Generate plot
-g_8
-# Turn off dark mode
-invert_geom_defaults()
-```
-
-Here see that Monday and Sunday were the best days for getting sleep during the year of 2020. 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+cumulative sum of mornings/swims
+a:C ratio for anything, aerobic zones 7:28
+weekend vs weekday

@@ -1,0 +1,556 @@
+---
+title: "Imogen's Metric Analysis"
+author: "Imogen Meers"
+date: "2/9/2025"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Set Up
+
+## Packages
+
+Let's load in the packages we will need for this analysis:
+
+```{r warning=FALSE}
+# install.packages("Hmisc)
+# install.packages("matrixStats")
+# install.packages("reshape")
+# install.packages("ggplot2")
+# install.packages("rlist")
+# install.packages("xgboost")
+
+library(Hmisc) # Load HMisc
+library(matrixStats) # Load matrix stats
+library(reshape) # Load reshape
+library(ggplot2) # Load ggplot2
+library(rlist) # Load rlist
+library(xgboost) # Load XGBoost
+library(readxl)
+library(dplyr)
+```
+
+
+
+For this analysis, we are going to be looking at personal metric data. You should be able to load in your own data in place of the provided data and run this for your own metrics:
+
+
+```{r}
+# Load in data
+load("metric_data_2020.rda")
+
+metric_data = read_excel("./Personal Metric Imogen.xlsx")
+metric_data$`Screen_Time` = metric_data$`Screen_Time` + (metric_data$`...8`/60)
+metric_data$`Sleep_Hours` = metric_data$`Sleep_Hours` + (metric_data$`...6`/60)
+
+
+metric_data <- metric_data %>% select(-`...6`, -`...8`) %>% mutate(Weekend = ifelse(Day == 'Saturday' | Day == 'Sunday', 1, 0)) 
+
+```
+
+
+# Sleep Analysis
+
+Sleep is a very important metric but often a single night of bad sleep is not going to have a massively detrimental effect. However, prolonged sleep deprivation is likely to negative consequences. To evaluate this, we are going to create a few derived variables to look at lagged sleep. 
+
+We want to look at this over different time periods so let's create a function to do this. 
+
+Let's start by writing the code to do it for a single metric, sleep.
+
+```{r}
+# Set parameter values
+lagged_days <- 7
+metric <- "Sleep_Hours"
+include_current <- TRUE
+
+# Extract vector to lag
+met_vec <- unlist(metric_data[,metric])
+
+if(include_current){
+    # Create empty data frame to store results
+    res_data <- matrix(NA, nrow = nrow(metric_data), ncol = lagged_days + 1)
+    
+    # Add current column to res_data
+    res_data[,lagged_days + 1] <- met_vec
+  } else{
+     # Create empty data frame to store results
+    res_data <- matrix(NA, nrow = nrow(metric_data), ncol = lagged_days)
+  
+}
+  
+
+
+
+# Loop through days and calculate lagged values
+for(i in 1:lagged_days){
+  # Store lagged values
+  res_data[,i] <- Lag(x = met_vec, shift = i)
+}
+
+# Create result vectors 
+mean_val <- sum_val <- max_val <- min_val <- missing_vals <- rep(NA, nrow(metric_data))
+
+# Calculate results for each day:
+mean_val <- rowMeans(res_data, na.rm = TRUE)
+sum_val <- rowSums(res_data, na.rm = TRUE)
+max_val <- rowMaxs(res_data, na.rm = TRUE)
+min_val <- rowMins(res_data, na.rm = TRUE)
+missing_vals <- rowSums(is.na(res_data))
+# Combine results vector
+results <- cbind.data.frame(mean_val, sum_val, max_val, min_val, missing_vals)
+
+  # Handle the infinite values for max and min calculations
+  results$max_val[is.infinite(results$max_val)] <- NA
+  results$min_val[is.infinite(results$min_val)] <- NA
+
+```
+
+Let's view what this looks like:
+
+```{r}
+head(results) # View first rows
+tail(results) # View last rows
+```
+
+This looks good, let's make it into a function:
+
+
+```{r}
+lag_metric_calculator <- function(metric_data, lagged_days = 3,
+                                  metric = "Sleep_Hours",
+                                  include_current = TRUE){
+  #'
+  #' This function carries out calculations on lagged values of a given
+  #' metric
+  #' 
+  #' @param metric_data The data frame containing the metrics of interest
+  #' @param lagged_days How many lagged days to use in the calculations
+  #' @param metric The metric to create the calculations for 
+  #' @param include_current Should the current day be included in the 
+  #' calculation
+  #'
+  #' @return This function returns a data frame containing the calculated mean,
+  #' sum, max, and min for the set time period (lagged_days). It also calculates
+  #' how many values were missing in that time period. 
+  #'
+  
+  # Extract vector to lag
+  met_vec <- unlist(metric_data[,metric])
+  
+  if(include_current){
+    # Create empty data frame to store results
+    res_data <- matrix(NA, nrow = nrow(metric_data), ncol = lagged_days + 1)
+    
+    # Add current column to res_data
+    res_data[,lagged_days + 1] <- met_vec
+  } else{
+     # Create empty data frame to store results
+    res_data <- matrix(NA, nrow = nrow(metric_data), ncol = lagged_days)
+  
+  }
+  
+  
+  # Loop through days and calculate lagged values
+  for(i in 1:lagged_days){
+    # Store lagged values
+    res_data[,i] <- Lag(x = met_vec, shift = i)
+  }
+  
+  # Calculate results for each day:
+  mean_val <- rowMeans(res_data, na.rm = TRUE) # Calculate mean value
+  sum_val <- rowSums(res_data, na.rm = TRUE) # Calculate sum value
+  max_val <- rowMaxs(res_data, na.rm = TRUE) # Calculate max value
+  min_val <- rowMins(res_data, na.rm = TRUE) # Calculate min value
+  missing_vals <- rowSums(is.na(res_data)) # Calculate missing values
+  
+  # Combine results vector
+  results <- cbind.data.frame(mean_val, sum_val, max_val, min_val, missing_vals)
+  
+  # Handle the infinite values for max and min calculations
+  results$max_val[is.infinite(results$max_val)] <- NA
+  results$min_val[is.infinite(results$min_val)] <- NA
+  
+  # Return results
+  return(results)
+}
+
+```
+
+Now let's calculate some summary stats for different windows:
+
+```{r}
+lag_2_res <- lag_metric_calculator(metric_data, lagged_days = 1,
+                                  metric = "Sleep_Hours",
+                                  include_current = TRUE)
+lag_3_res <- lag_metric_calculator(metric_data, lagged_days = 2,
+                                  metric = "Sleep_Hours",
+                                  include_current = TRUE)
+lag_7_res <- lag_metric_calculator(metric_data, lagged_days = 6,
+                                  metric = "Sleep_Hours",
+                                  include_current = TRUE)
+```
+
+
+Let's look at the relationship between these values and some other metrics:
+
+First we can look at productivity:
+
+```{r warning=FALSE}
+# Set metric to look at 
+metric_1 <- "Productivity"
+
+# Add metric to lagged results
+analysis_2_res <- cbind.data.frame(lag_2_res, metric_data[,metric_1])
+
+# Melt data to long form
+plot_res <- melt(analysis_2_res, id.vars =metric_1)
+names(plot_res)[1] <- "metric_1"
+
+# Create plot
+g_1 <-  ggplot(plot_res, # Set data
+               aes(x = value, y = metric_1, color = variable)) + # Set aesthetics
+  geom_point(alpha = 0.3) + # Set geom point for scatter plot
+  geom_smooth() + # Add smoothing line
+  labs(y = paste(metric_1), # Add labels
+       title = paste(metric_1, "v", "Sleep Hours (2 day lag)")) +
+  facet_wrap(~variable, scales = "free") + # Wrap facets
+   theme(axis.line = element_line(colour = "black"), # Set axis line as black
+        panel.grid.major = element_blank(), # Remove grid
+        panel.grid.minor = element_blank(), # Remove grid
+        panel.border = element_blank(), # Remove grid
+        panel.background = element_blank())  # Remove grid 
+# Generate plot
+g_1
+```
+
+
+```{r warning=FALSE}
+# Set metric to look at 
+metric_1 <- "Productivity"
+
+# Add metric to lagged results
+analysis_3_res <- cbind.data.frame(lag_3_res, metric_data[,metric_1])
+
+# Melt data to long form
+plot_res <- melt(analysis_3_res, id.vars =metric_1)
+names(plot_res)[1] <- "metric_1"
+
+# Create plot
+g_2 <-  ggplot(plot_res, # Set data
+               aes(x = value, y = metric_1, color = variable)) + # Set aesthetics
+  geom_point(alpha = 0.3) + # Add points to plot
+  geom_smooth() + # Add smoothing line
+  labs(y = paste(metric_1), # Add labels
+       title = paste(metric_1, "v", "Sleep Hours (3 day lag)")) +
+  facet_wrap(~variable, scales = "free") + # Add facets
+   theme(axis.line = element_line(colour = "black"), # Set axis line as black
+        panel.grid.major = element_blank(), # Remove grid
+        panel.grid.minor = element_blank(), # Remove grid
+        panel.border = element_blank(), # Remove grid
+        panel.background = element_blank())  # Remove grid 
+# Generate plot
+g_2
+```
+
+
+This is the most interesting Sleep vs Productivity plot to me as it highlight well the times at which I am most productive.
+
+For min and mean val over the last 3 days, I am most productive when this value is in the middle (maybe slightly towards the higher end). It drops off when I sleep too much and too little. For sum of over the last three days, you can also see a peak at around 24 hours, but a drop off if it is more or less. These results are unsurprising as low values of sleep will affect my productivity if I am not able to function as well or maybe I am taking more naps because I am not sleeping well at night. But consistent high values over 3 days also have a negative impact on productivity, which can be explained by the fact that I am probably so exhausted that I cannot be productive.
+
+
+```{r warning=FALSE}
+# Set metric to look at 
+metric_1 <- "Productivity"
+
+# Add metric to lagged results
+analysis_7_res <- cbind.data.frame(lag_7_res, metric_data[,metric_1])
+
+# Melt data to long form
+plot_res <- melt(analysis_7_res, id.vars =metric_1)
+names(plot_res)[1] <- "metric_1"
+
+# Create plot
+g_3 <-  ggplot(plot_res, # Set data
+               aes(x = value, y = metric_1, color = variable)) + # Set aesthetics
+  geom_point(alpha = 0.3) + # Add points to plot
+  geom_smooth() + # Add smoothing line
+  labs(y = paste(metric_1), # Add labels
+       title = paste(metric_1, "v", "Sleep Hours (7 day lag)")) +
+  facet_wrap(~variable, scales = "free") + # Add facets
+   theme(axis.line = element_line(colour = "black"), # Set axis line as black
+        panel.grid.major = element_blank(), # Remove grid
+        panel.grid.minor = element_blank(), # Remove grid
+        panel.border = element_blank(), # Remove grid
+        panel.background = element_blank())  # Remove grid 
+# Generate plot
+g_3
+```
+
+Next let's look at wake up:
+
+```{r warning=FALSE}
+# Set metric to look at 
+metric_1 <- "Wake_Up"
+
+# Add metric to lagged results
+analysis_2_res <- cbind.data.frame(lag_2_res, metric_data[,metric_1])
+
+# Melt data to long form
+plot_res <- melt(analysis_2_res, id.vars =metric_1)
+names(plot_res)[1] <- "metric_1"
+
+# Create plot
+g_4 <-  ggplot(plot_res, # Set data
+               aes(x = value, y = metric_1, color = variable)) + # Set aesthetics
+  geom_point(alpha = 0.3) + # Set geom point for scatter plot
+  geom_smooth() + # Add smoothing line
+  labs(y = paste(metric_1), # Add labels
+       title = paste(metric_1, "v", "Sleep Hours (2 day lag)")) +
+  facet_wrap(~variable, scales = "free") + # Wrap facets
+   theme(axis.line = element_line(colour = "black"), # Set axis line as black
+        panel.grid.major = element_blank(), # Remove grid
+        panel.grid.minor = element_blank(), # Remove grid
+        panel.border = element_blank(), # Remove grid
+        panel.background = element_blank())  # Remove grid 
+# Generate plot
+g_4
+```
+
+```{r warning=FALSE}
+# Set metric to look at 
+metric_1 <- "Wake_Up"
+
+# Add metric to lagged results
+analysis_3_res <- cbind.data.frame(lag_3_res, metric_data[,metric_1])
+
+# Melt data to long form
+plot_res <- melt(analysis_3_res, id.vars =metric_1)
+names(plot_res)[1] <- "metric_1"
+
+# Create plot
+g_5 <-  ggplot(plot_res, # Set data
+               aes(x = value, y = metric_1, color = variable)) + # Set aesthetics
+  geom_point(alpha = 0.3) + # Set geom point for scatter plot
+  geom_smooth() + # Add smoothing line
+  labs(y = paste(metric_1), # Add labels
+       title = paste(metric_1, "v", "Sleep Hours (3 day lag)")) +
+  facet_wrap(~variable, scales = "free") + # Wrap facets
+   theme(axis.line = element_line(colour = "black"), # Set axis line as black
+        panel.grid.major = element_blank(), # Remove grid
+        panel.grid.minor = element_blank(), # Remove grid
+        panel.border = element_blank(), # Remove grid
+        panel.background = element_blank())  # Remove grid 
+# Generate plot
+g_5
+```
+
+```{r warning=FALSE}
+# Set metric to look at 
+metric_1 <- "Wake_Up"
+
+# Add metric to lagged results
+analysis_7_res <- cbind.data.frame(lag_7_res, metric_data[,metric_1])
+
+# Melt data to long form
+plot_res <- melt(analysis_7_res, id.vars =metric_1)
+names(plot_res)[1] <- "metric_1"
+
+# Create plot
+g_6 <-  ggplot(plot_res, # Set data
+               aes(x = value, y = metric_1, color = variable)) + # Set aesthetics
+  geom_point(alpha = 0.3) + # Set geom point for scatter plot
+  geom_smooth() + # Add smoothing line
+  labs(y = paste(metric_1), # Add labels
+       title = paste(metric_1, "v", "Sleep Hours (7 day lag)")) +
+  facet_wrap(~variable, scales = "free") + # Wrap facets
+   theme(axis.line = element_line(colour = "black"), # Set axis line as black
+        panel.grid.major = element_blank(), # Remove grid
+        panel.grid.minor = element_blank(), # Remove grid
+        panel.border = element_blank(), # Remove grid
+        panel.background = element_blank())  # Remove grid 
+# Generate plot
+g_6
+```
+
+
+## Adding Modelling
+
+Let's see what predictive power is present here for some metrics:
+
+
+```{r}
+# Create vector of metrics
+metrics <- c("Wake_Up", "Screen_Time", "Pickups",
+             "Productivity", "Sleep_Hours", "Weekend")
+# Create vector of lags
+lags <- c(1,3,7)
+
+
+# Create list to store results
+res_list <- vector(mode = "list", length = length(metrics) * length(lags))
+
+# For each lag
+for(i in 1:length(lags)){
+  # For each metric
+  for(j in 1:length(metrics)){
+    if(metrics[j] == "Sleep_Hours"){
+          # Calculate lagged summary stats
+    temp <- lag_metric_calculator(metric_data, lagged_days = lags[i],
+                                  metric = metrics[j],
+                                  include_current = TRUE)
+    } else {
+              # Calculate lagged summary stats
+    temp <- lag_metric_calculator(metric_data, lagged_days = lags[i],
+                                  metric = metrics[j],
+                                  include_current = FALSE)
+    }
+
+    # Set names
+    names(temp) <- paste(names(temp), metrics[j], lags[i], sep ="_")
+    
+    # Store Results
+    res_list[[(j + ((i-1) * length(metrics)))]] <- temp
+  }
+}
+
+```
+
+Let's join the results together
+```{r}
+m_dat <- list.cbind(res_list)
+```
+
+Let's choose a variable to use as the response:
+
+```{r}
+# Assign response variable
+response <- metric_data$Productivity
+```
+
+Let's drop rows where we have missing values for the response variable
+```{r}
+# Drop missing response rows
+m_dat <- m_dat[!is.na(response),]
+response <- response[!is.na(response)]
+```
+
+
+Now let's set our data up for modeling:
+
+```{r}
+dtrain <- xgb.DMatrix(data = as.matrix(m_dat), label = response)
+```
+
+Let's run a model:
+
+```{r}
+fit_1 <- xgboost(dtrain,  # Set dataset to use
+                 nrounds = 100, # Set number of rounds
+               
+               verbose = 1, # 1 - Prints out fit
+                print_every_n = 20 # Prints out result every 20th iteration
+)
+```
+
+Let's load in the SHAP functions:
+
+```{r}
+# Load SHAP functions
+source("a_insights_shap_functions.r")
+```
+
+Now let's generate some SHAP charts:
+
+```{r}
+# Calculate SHAP importance
+shap_result <- shap.score.rank(xgb_model = fit_1, 
+                X_train =as.matrix(m_dat),
+                shap_approx = F)
+# Calculate data for SHAP plot
+shap_long = shap.prep(shap = shap_result,
+                           X_train = as.matrix(m_dat), 
+                           top_n = 10)
+
+# Generate SHAP plot
+plot.shap.summary(data_long = shap_long)
+```
+
+From this SHAP plot, we can see the Sleep Hours is generally the most important factor regarding Productivity for me. My top factor is my minimum value of sleep over the last 3 days and when this value is high it has a positive impact of productive. This probably means that I am greatly impacted by one night of bad sleep rather than multiple days of ok sleep. 
+
+Interestingly, my second strongest factor is the sum of my phone pickups across the last 7 days. This is more spread out than the min sleep, but seems to show higher values have a positive impact on productivity. This could be because if I am picking my phone up more in the previous days maybe I am doing less work so I feel the need to be more productive today!
+
+All of my values in this SHAP plot have a positive correlation with productivity, meaning the higher their values, the higher my productivity and most of them have their positive values with high feature value, meaning the high values of those metrics affect the model most. However, there are some metrics of sleep, such as mean sleep in the last 3 days and yesterday, and max sleep yesterday, that have low values with high feature value. This means that my recent sleep habits can also have a negative effect on my productivity if they are particularly bad as well as having a positive effect if they are particularly good.
+
+I added a weekend value to this SHAP plot to see if there are any particular patterns with my productivity on the weekend vs weekdays that could skew my other factors (e.g. I get lots of sleep on Saturday, but I am not productive on Sunday) but it proved to not be a very important factor.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
