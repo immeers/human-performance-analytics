@@ -86,87 +86,126 @@ summary(plot_data) # Summarise metric data
 ```
 This data has 1477 rows dating from July 2020 to present. It includes general data on physiological cycles including sleep and  daily metrics.
 ```{r}
+  # Create a mapping of time zone offsets to Olson names
+  tzone_mapping <- c(
+    "UTC-05:00" = "America/New_York",
+    "UTCZ" = "UTC",
+    "UTC-06:00" = "America/Chicago",
+    "UTC-07:00" = "America/Denver",
+    "UTC-04:00" = "America/Halifax",
+    "UTC+02:00" = "Europe/Bucharest",
+    "UTC+01:00" = "Europe/Paris"
+  )
 
-
-# Create a mapping of time zone offsets to Olson names
-tzone_mapping <- c(
-  "UTC-05:00" = "America/New_York",
-  "UTCZ" = "UTC",
-  "UTC-06:00" = "America/Chicago",
-  "UTC-07:00" = "America/Denver",
-  "UTC-04:00" = "America/Halifax",
-  "UTC+02:00" = "Europe/Bucharest",
-  "UTC+01:00" = "Europe/Paris"
-)
-
-plot_data <- plot_data %>%
-  mutate(cycle_olson = tzone_mapping[cycle_tzone])
-
-# Convert cycle_start to POSIXct
-plot_data <- plot_data %>% rowwise() %>%
-  mutate(cycle_start = ymd_hms(cycle_start, tz = cycle_olson),
-         cycle_end = ymd_hms(cycle_end, tz = cycle_olson),
-         wake_onset = ymd_hms(wake_onset, tz = cycle_olson),
-         sleep_onset = ymd_hms(sleep_onset, tz = cycle_olson),) %>% ungroup()
-
-
-
-
-
-#grade mapping
-# Define the mapping function
-grade_mapping <- function(date) {
-  if (date >= as.Date("2020-08-01") & date < as.Date("2021-05-01")) {
-    return("Freshman")
-  } else if (date >= as.Date("2021-05-01") & date < as.Date("2022-05-01")) {
-    return("Sophomore")
-  } else if (date >= as.Date("2022-05-01") & date < as.Date("2023-05-01")) {
-    return("Junior")
-  } else if (date >= as.Date("2023-05-01") & date < as.Date("2024-05-01")) {
-    return("Senior")
-  } else if (date >= as.Date("2024-05-01")) {
-    return("Grad")
-  } else {
-    return(NA)  # In case date does not fall within any range
+  grade_mapping <- function(date) {
+    #' This calculates grade based on date range
+    #'
+    #' @param date the date to find the grade from
+    #' 
+    #' @return grade as string
+    #'
+    #'
+    
+    
+    
+    if (date >= as.Date("2020-08-01") & date < as.Date("2021-05-01")) {
+      return("Freshman")
+    } else if (date >= as.Date("2021-05-01") & date < as.Date("2022-05-01")) {
+      return("Sophomore")
+    } else if (date >= as.Date("2022-05-01") & date < as.Date("2023-05-01")) {
+      return("Junior")
+    } else if (date >= as.Date("2023-05-01") & date < as.Date("2024-05-01")) {
+      return("Senior")
+    } else if (date >= as.Date("2024-05-01")) {
+      return("Grad")
+    } else {
+      return(NA)  # In case date does not fall within any range
+    }
   }
-}
-
-plot_data <- plot_data %>% filter(!is.na(cycle_start) & !is.na(cycle_end) & !is.na(wake_onset))
 
 
-# Apply the function to the data frame
-plot_data <-  plot_data %>% mutate(grade = sapply(wake_onset, grade_mapping))
-summary(plot_data)
 
-days_since_mapping <- function(grade, date) {
-  if (is.na(grade)){
-    return(NA)
+
+  days_since_mapping <- function(grade, date) {
+    
+  #' This calculates number of days since the start of the season depending on grade (rowwise)
+  #'
+  #' @param grade the grade as a string
+  #' @param date the date to find the difference from
+  #' 
+  #' @return number of days from date
+  #'
+  #'
+    if (is.na(grade)){
+      return(NA)
+    }
+    
+    
+    if (grade == "Freshman") {
+      reference_date = "2020-05-01"
+      return(as.integer(difftime(date, reference_date, units = "days")))
+    } else if (grade == "Sophomore") {
+      reference_date = "2021-05-01"
+      return(as.integer(difftime(date, reference_date, units = "days")))
+    } else if (grade == "Junior") {
+      reference_date = "2022-05-01"
+      return(as.integer(difftime(date, reference_date, units = "days")))
+    } else if (grade == "Senior") {
+        reference_date = "2023-05-01"
+        return(as.integer(difftime(date, reference_date, units = "days")))
+    } else {
+        reference_date = "2024-05-01"
+        return(as.integer(difftime(date, reference_date, units = "days")))
+    }
   }
+
+date_cleaning <- function(plot_data){
+  #'
+  #' This function cleans up the dates, and assigns years and days since the start of the period
+  #'
+  #' @param plot_data the unclean df
+  #' 
+  #' @return A cleaned df with appropriate manipulated and added fields
+  #'
+
+  
+
+  
+  # Apply mapping of tzone
+  plot_data <- plot_data %>%
+    mutate(cycle_olson = tzone_mapping[cycle_tzone])
+  
+  # Convert to dates, but also converts tzone to UTC (don't want) so force_tz
+  plot_data <- plot_data %>% rowwise() %>%
+    mutate(cycle_start = force_tz(ymd_hms(cycle_start, tz = cycle_olson)),
+           cycle_end = force_tz(ymd_hms(cycle_end, tz = cycle_olson)),
+           wake_onset = force_tz(ymd_hms(wake_onset, tz = cycle_olson)),
+           sleep_onset = force_tz(ymd_hms(sleep_onset, tz = cycle_olson)),) %>% ungroup() 
   
   
-  if (grade == "Freshman") {
-    reference_date = "2020-05-01"
-    return(as.numeric(difftime(date, reference_date, units = "days")))
-  } else if (grade == "Sophomore") {
-    reference_date = "2021-05-01"
-    return(as.numeric(difftime(date, reference_date, units = "days")))
-  } else if (grade == "Junior") {
-    reference_date = "2022-05-01"
-    return(as.numeric(difftime(date, reference_date, units = "days")))
-  } else if (grade == "Senior") {
-      reference_date = "2023-05-01"
-      return(as.numeric(difftime(date, reference_date, units = "days")))
-  } else {
-      reference_date = "2024-05-01"
-      return(as.numeric(difftime(date, reference_date, units = "days")))
-  }
+
+  
+  plot_data <- plot_data %>% filter(!is.na(cycle_start) & !is.na(cycle_end) & !is.na(wake_onset))
+  
+  # Apply the function to the data frame
+  plot_data <-  plot_data %>% mutate(grade = sapply(wake_onset, grade_mapping))
+  summary(plot_data)
+  
+
+  # Apply the function to the data frame
+  plot_data <-  plot_data %>% mutate(days_since = mapply(days_since_mapping, grade, as.Date(wake_onset)))
+  
+  #Remove time zone cols
+  plot_data <- plot_data %>% select(-cycle_olson, -cycle_tzone)
+  
+  return(plot_data)
+
 }
 
+plot_data <- date_cleaning(plot_data)
 
-# Apply the function to the data frame
-plot_data <-  plot_data %>% mutate(days_since = mapply(days_since_mapping, grade, wake_onset))
+melted_data <- plot_data %>% select(-c(cycle_start, cycle_end, sleep_onset )) %>% pivot_longer(cols = -c(wake_onset, grade, days_since), names_to = "metric", values_to= "value")
 
-melted_data <- plot_data %>% select(-c(cycle_start, cycle_end, cycle_tzone, cycle_olson, sleep_onset )) %>% pivot_longer(cols = -c(wake_onset, grade, days_since), names_to = "metric", values_to= "value")
 
 ```
 
@@ -255,26 +294,10 @@ summary_week$week = as.POSIXct.Date(summary_week$week)
 sleep = read.csv("sleeps.csv")
 colnames(sleep) = c("cycle_start", "cycle_end", "cycle_tzone", "sleep_onset", "wake_onset", "performance", "resp_rate", "asleep_dur", "in_bed_dur", "light_sleep", "deep_sleep", "rem", "awake", "sleep_need", "sleep_debt", "efficiency", "consistency", "nap")
 
-sleep_data <- sleep %>%
-  mutate(cycle_olson = tzone_mapping[cycle_tzone])
-
-# Convert cycle_start to POSIXct
-sleep_data <- sleep_data %>%
-  rowwise() %>%
-  mutate(cycle_start = ymd_hms(cycle_start, tz = cycle_olson)) %>% 
-  mutate(cycle_end = ymd_hms(cycle_end, tz = cycle_olson)) %>%
-  mutate(sleep_onset = ymd_hms(sleep_onset, tz = cycle_olson)) %>% 
-  mutate(wake_onset = ymd_hms(wake_onset, tz = cycle_olson)) %>% ungroup()
+sleep_data <- date_cleaning(sleep)
 
 
-sleep_data <- sleep_data %>% select(-c(cycle_start, cycle_end, sleep_onset, cycle_tzone, cycle_olson))
-
-sleep_data <-  sleep_data %>% filter(wake_onset >= as.Date("2020-08-01")) %>% mutate(grade = sapply(wake_onset, grade_mapping))
-
-# Apply the function to the data frame
-sleep_data <-  sleep_data %>% mutate(days_since = mapply(days_since_mapping, grade, wake_onset)) %>% select(-nap)
-
-melted_data <- sleep_data %>% pivot_longer(cols = -c(wake_onset, grade, days_since), names_to = "metric", values_to= "value")
+melted_data <- sleep_data %>% select(-c(cycle_start, cycle_end, sleep_onset, nap)) %>% pivot_longer(cols = -c(wake_onset, grade, days_since), names_to = "metric", values_to= "value")
 
 ```
 
@@ -388,7 +411,8 @@ colnames(workouts) = c("cycle_start", "cycle_end", "cycle_tzone", "workout_start
 
 workouts$date = as.Date(workouts$workout_start)
 
-workouts = workouts %>% select(-c(cycle_start, cycle_end, cycle_tzone, cals, max_hr, av_hr)) %>% mutate(workout_start = ymd_hms(workout_start), workout_end = ymd_hms(workout_end)) %>%
+workouts = workouts %>%
+  mutate(workout_start = ymd_hms(workout_start), workout_end = ymd_hms(workout_end)) %>%
     mutate(morning = ifelse(format(workout_start, "%H:%M:%S") < "12:00:00", 1, 0))
 
 sessions <- workouts %>%
@@ -405,14 +429,18 @@ activities = workouts %>%
   group_by(date, activity) %>%
   summarise(count = n()) %>%
   ungroup() %>%   pivot_wider(names_from = activity, values_from = count, values_fill = list(count = 0))  %>%
-  rename_at(vars(-date), ~ paste0(., "_count")) %>% select(date, Swimming_count, Weightlifting_count, Activity_count)
+  rename_at(vars(-date), ~ paste0(., "_count")) %>% select(date, Swimming_count, Weightlifting_count, Activity_count, Cycling_count) %>% mutate(Dryland_count = Weightlifting_count + Activity_count + Cycling_count) %>% select(date, Swimming_count, Dryland_count)
+
+
+zones = workouts %>% group_by(date) %>% summarise( zone1 = sum(zone1), zone2 = sum(zone2), zone3 = sum(zone3), zone4 = sum(zone4), zone5 = sum(zone5))
+
  
-workout_data = merge(activities, sessions, by ="date")
-workout_data$date = as.POSIXct(workout_data$date)
-workout_data <-  workout_data %>% mutate(grade = sapply(date, grade_mapping)) %>% na.omit()
+workout_data = merge(merge(activities, sessions, by ="date"), zones, by = "date")
+workout_data$date = as.Date(workout_data$date)
+workout_data <-  workout_data %>% mutate(grade = sapply(date, grade_mapping)) 
 
 
-pre_meet = workout_data %>% mutate(conf_date = mdy(conference_dates[grade]), midseason_date = mdy(midseason_dates[grade])) %>% filter(conf_date-21  <= date & date <= conf_date | (midseason_date-21  <= date & date <= midseason_date)) %>% 
+pre_meet = workout_data %>% na.omit() %>% mutate(conf_date = mdy(conference_dates[grade]), midseason_date = mdy(midseason_dates[grade])) %>% filter(conf_date-21  <= date & date <= conf_date | (midseason_date-21  <= date & date <= midseason_date)) %>% 
   mutate(days_til1 = (as.numeric(difftime(conf_date, date, units = "days"))))%>% 
   mutate(days_til2 = (as.numeric(difftime(midseason_date, date, units = "days")))) %>% 
   rowwise() %>% mutate(days_til = ifelse(days_til2 >= 0, min(days_til2, days_til1), max(days_til2, days_til1))) %>% ungroup() %>% select(-days_til1, -days_til2) %>% mutate(event =ifelse( abs(difftime(conf_date, date)) > abs(difftime(midseason_date, date)),  "conference", "midseason"))
@@ -516,6 +544,7 @@ Based on my EDA and my knowledge of how I have swam over the years, there are ce
 
 
 
+
 ```{r Get top 5 event results as output for model}
 library(readxl)
 top5 <- read_excel("swim_top5.xlsx") %>%
@@ -579,15 +608,382 @@ To do:
 - lasso correlation between imp and anything?
 
 
+#days until all meets and take 21 or 14?
 
+## Final Dataframe
+
+```{r}
+library(mice)
+all_whoop <- inner_join(sleep_data, plot_data)
+all_whoop$date = as.Date(all_whoop$wake_onset)
+
+all_whoop <- left_join(all_whoop, workout_data)
+summary(all_whoop)
+
+all_whoop <- all_whoop %>% mutate(date = as.Date(wake_onset))
+
+all_whoop <- all_whoop %>% 
+  mutate(across(34:44, ~ifelse(is.na(.), 0, .))) #impute NA workout data with 0-- I did no workout
+
+
+#Derive some more variables
+all_whoop <- all_whoop %>% arrange(date) %>% mutate(waking_hours = as.numeric(difftime(time1= as.POSIXct(wake_onset), time2 =as.POSIXct(sleep_onset), units = 'hours')))
+
+```
+
+## Imputation
+
+```{r Dealing with NAs}
+#Lets remove some NAs
+#Need to impute sleep consistency, consistency and day strain
+all_whoop <- all_whoop %>% filter(!is.na(grade)) %>% select(-blood_oxygen, -resp_rate, -skin_temp)
+
+#Separate into numeric and non numeric
+numeric <- all_whoop %>% select_if(is.numeric)
+not_numeric <- all_whoop %>% select_if(~ !is.numeric(.))
+
+correlation_matrix <- cor(numeric, use = "complete.obs")
+which(correlation_matrix == 1, arr.ind = TRUE) #Lets look for perfect correlations
+```
+
+We can see that sleep consistency and consistency, and awake and awake_dur are perfectly correlated so we don't need both of them. Let's remove sleep consistency
 
 
 ```{r}
+#Remove sleep consistency
+numeric <- numeric %>% select(-sleep_consistency, -awake)
+
+#Impute remaining NAs in consistency and day strain with MICE
+imputed_data <- mice(numeric, m = 5, method = 'pmm', maxit = 50, seed = 500, print=FALSE)
+
+sum(is.na(imputed_data))
+
+complete_numeric <- complete(imputed_data, 1)
+
+sum(is.na(complete_numeric))
+
+whoop_imputed <- cbind(not_numeric, complete_numeric)
+sum(is.na(whoop_imputed))
+
+dim(whoop_imputed)[1] == dim(all_whoop)[1] #they are still the same length
+```
+
+We have dealt with all NAs.
+
+
+Now we can create all other derived variables:
+
+## Derived Variables
+
+### AC Ratio
+
+```{r}
+
+
+#Lets split metric-admin for AC ratio
+#I want to look at aerobic zones, total_dur, counts and day strain
+#Look over ratios: 3:7, 7:21
+
+met_data <- all_whoop %>% select(zone1, zone2, zone3, zone4, zone5, day_strain, Swimming_count, Dryland_count, total_dur, count_morning, count_afternoon) 
+admin_dat <- all_whoop %>% select(-c(zone1, zone2, zone3, zone4, zone5, day_strain, Swimming_count, Dryland_count, total_dur, count_morning, count_afternoon)) %>% rename(days = days_since)
+
+```
+
+
+```{r AC ratio}
+sum_days <- function(met_data, admin_dat, met, days){
+  #'
+  #' This function calculates the sum of a given metric over a 
+  #' period of time.
+  #'
+  #' @param met_data Data frame of metrics over a given period
+  #' @param admin_data Data frame of adminstration variables, with 
+  #' columns of players, indicating player id, and days, indicating the
+  #' day each metric was measured on
+  #' @param met The metric to calculate the sum for
+  #' @param days The time window to calculate the sum for
+  #' 
+  #' @return A vector containing the summed variable over the 
+  #' previous days period for each row.
+  #'
+  #' @examples
+  #' g_data <- data.frame(distance = c(1,2,3,4))
+  #' a_data <- data.frame(players = c(1,1,1,1),
+  #'                          days = c(1,2,3,4))
+  #' sum_res <- sum_days(met_data = g_data,
+  #'                     admin_dat = a_data,
+  #'                     met = "distance",
+  #'                     days = 2)
+  #'
+  
+  # Create empty vector to store results
+  sum_vec <- rep(NA, nrow(met_data))
+  # For each row of results data frame
+  for(i in 1:nrow(met_data)){
+    # Extract previous data which falls in given window, for given metric
+    temp_vec <- met_data[which(admin_dat$days < admin_dat$days[i] &
+                               admin_dat$days >= (admin_dat$days[i] - days)),c(met)]
+    # If the length of this vector is at least 1
+    if(length(temp_vec) >= 1){
+      # Calculate sum of the values and assign to result vector
+      sum_vec[i] <- sum(temp_vec, na.rm = T)
+    }
+  }
+  # Return result vector
+  return(sum_vec)
+}
+
+```
+
+
+```{r}
+ac_ratio <- function(met_data, admin_dat, met, days_1, days_2){
+  #'
+  #' This function calculates the acute:chronic ratio for a given 
+  #' metric over a set time period. 
+  #' 
+  #' @param met_data A data frame containing metric values
+  #' @param admin_data Data frame of adminstration variables, with 
+  #' columns of players, indicating player id, and days, indicating the
+  #' day each metric was measured on.
+  #' @param met The metric of interest
+  #' @param days_1 - The number of days to use for the acute window
+  #' @param days_2 - The number of days to use for the chronic window
+  #'
+  #' @return A vector of the acute chronic window corresponding to each
+  #' row in met_data and admin_db
+  #'
+  #' @examples
+  #' g_data <- data.frame(distance = c(1,2,3,4))
+  #' a_data <- data.frame(players = c(1,1,1,1),
+  #'                          days = c(1,2,3,4))
+  #' ac_res <- ac_ratio(met_data = g_data,
+  #'                    admin_dat = a_data,
+  #'                    met = "distance",
+  #'                    days_1 = 1,
+  #'                    days_2 = 2)
+  #'
+  
+  # Calculate the sum of values for the acute window
+  sum_vec_1 <- sum_days(met_data, admin_dat, met = met, days = days_1)
+  # Calculate the sum of values for the chronic window
+  sum_vec_2 <- sum_days(met_data, admin_dat, met = met, days = days_2)
+  # Modify the chronic vector to same level as acute
+  mod_sum_vec_2 <- sum_vec_2 * (days_1/days_2)
+  # Calculate AC ratio
+  ac_ratio <- sum_vec_1/mod_sum_vec_2
+  # Return ac ratio vector
+  return(ac_ratio)
+}
+
+
 
 ```
 
 
 
+```{r}
+# Create empty data frames to store our results
+sum_7_res <- sum_3_res <- sum_14_res <- ac_7_21_res <- ac_3_7_res <-  as.data.frame(matrix(NA, nrow = nrow(met_data), ncol = ncol(met_data)))
+
+
+# For each column in the gps data
+for(i in 1:ncol(met_data)){
+  # Calculate the sum over 3 days
+  sum_3_res[,i] <- sum_days(met_data, # Set GPS data
+                            admin_dat,  # Set Admin data
+                            met = names(met_data)[i], # Set metric to use
+                            days = 7) # Set window size
+  
+  # Calculate the sum over 7 days
+  sum_7_res[,i] <- sum_days(met_data, # Set GPS data
+                             admin_dat,  # Set admin data
+                             met = names(met_data)[i], # Set metric to use
+                             days = 28) # Set window size
+  
+  # Calculate the sum over 14 days
+  sum_14_res[,i] <- sum_days(met_data, # Set GPS data
+                             admin_dat, # Set admin data
+                             met = names(met_data)[i], # Set metric to use
+                             days = 56) # Set window size
+  
+  # Calculate the A:C ratio for 7:21
+  ac_7_21_res[,i] <- ac_ratio(met_data, # Set GPS data
+                              admin_dat, # Set admin data
+                              met = names(met_data)[i], # Set metric to use
+                              days_1 = 7, # Set acute window
+                              days_2 = 21) # Set chronic window
+  
+  # Calculate the A:C ratio for 3:7
+  ac_3_7_res[,i] <- ac_ratio(met_data, # Set GPS data
+                               admin_dat, # Set admin data
+                               met = names(met_data)[i], # Set metric to use
+                               days_1 = 3, # Set acute window
+                               days_2 = 3) # Set chronic window
+  
+}
+```
+
+Next up we need to fix the names of the result data frames we have calculated so that we can tell which metric is which:
+
+```{r}
+# Set names for 7 day sums
+names(sum_7_res) <- paste(names(met_data), "_sum_7_days", sep="")
+# Set names for 28 day sums
+names(sum_14_res) <- paste(names(met_data), "_sum_14_days", sep="")
+# Set names for 56 day sums
+names(sum_3_res) <- paste(names(met_data), "_sum_3_days", sep="")
+# Set names for A:C 7:21
+names(ac_7_21_res) <- paste(names(met_data), "_ac_7_21", sep="")
+# Set names for A:C 28:56
+names(ac_3_7_res) <- paste(names(met_data), "_ac_3_7", sep="")
+
+```
+
+Finally we want to rejoin all our data together so that we have a single data frame to work with:
+
+```{r}
+# Join data together
+met_dat <- cbind.data.frame(met_data, sum_3_res, sum_7_res, sum_14_res, ac_3_7_res, ac_7_21_res)
+
+dim(met_dat)
+dim(admin_dat)
+
+all_whoop_1 <- cbind.data.frame(admin_dat, met_dat)
+
+```
+
+
+### Sleep Lag
+
+in_bed_dur, awake_dur, asleep_dur, deep_sleep, rem, sleep_need, sleep_debt, sleep_performance, waking_hours
+
+
+
+```{r}
+sleep_met <- all_whoop_1 %>% select(in_bed_dur, awake_dur, asleep_dur, deep_sleep, rem, sleep_need, sleep_debt, sleep_performance, waking_hours)
+
+sleep_admin <- all_whoop_1 %>% select(-c(in_bed_dur, awake_dur, asleep_dur, deep_sleep, rem, sleep_need, sleep_debt, sleep_performance, waking_hours))
+```
+
+
+```{r}
+
+lag_metric_calculator <- function(metric_data, lagged_days = 3,
+                                  metric = "in_bed_dur",
+                                  include_current = TRUE){
+  #'
+  #' This function carries out calculations on lagged values of a given
+  #' metric
+  #' 
+  #' @param metric_data The data frame containing the metrics of interest
+  #' @param lagged_days How many lagged days to use in the calculations
+  #' @param metric The metric to create the calculations for 
+  #' @param include_current Should the current day be included in the 
+  #' calculation
+  #'
+  #' @return This function returns a data frame containing the calculated mean,
+  #' sum, max, and min for the set time period (lagged_days). It also calculates
+  #' how many values were missing in that time period. 
+  #'
+  
+  # Extract vector to lag
+  met_vec <- unlist(metric_data[,metric])
+  
+  if(include_current){
+    # Create empty data frame to store results
+    res_data <- matrix(NA, nrow = nrow(metric_data), ncol = lagged_days + 1)
+    
+    # Add current column to res_data
+    res_data[,lagged_days + 1] <- met_vec
+  } else{
+     # Create empty data frame to store results
+    res_data <- matrix(NA, nrow = nrow(metric_data), ncol = lagged_days)
+  
+  }
+  
+  
+  # Loop through days and calculate lagged values
+  for(i in 1:lagged_days){
+    # Store lagged values
+    res_data[,i] <- lag(x = met_vec, n = i)
+  }
+  
+  # Calculate results for each day:
+  mean_val <- rowMeans(res_data, na.rm = TRUE) # Calculate mean value
+  sum_val <- rowSums(res_data, na.rm = TRUE) # Calculate sum value
+  max_val <- rowMaxs(res_data, na.rm = TRUE) # Calculate max value
+  min_val <- rowMins(res_data, na.rm = TRUE) # Calculate min value
+  
+  # Combine results vector
+  results <- cbind.data.frame(mean_val, sum_val, max_val, min_val)
+  
+  # Handle the infinite values for max and min calculations
+  results$max_val[is.infinite(results$max_val)] <- NA
+  results$min_val[is.infinite(results$min_val)] <- NA
+  
+  
+  names(results) <- paste(names(results), "_lag_", as.character(lagged_days+1), "_res", sep="")
+  
+  # Return results
+  return(results)
+}
+```
+
+```{r, eval=FALSE}
+
+sleep_metrics = c('in_bed_dur', 'awake_dur', 'asleep_dur', 'deep_sleep', 'rem', 'sleep_need', 'sleep_debt', 'sleep_performance', 'waking_hours')
+sleep_lags = data.frame()
+
+lag_3_res <- lag_7_res <- lag_14_res <-  as.data.frame(matrix(NA, nrow = nrow(sleep_met), ncol = 5))
+
+for (i in seq(1:length(sleep_metrics))){
+  lag_3_res <- lag_7_res <- lag_14_res <-  as.data.frame(matrix(NA, nrow = nrow(sleep_met), ncol = 5))
+
+  lag_3_res <- lag_metric_calculator(sleep_met, lagged_days = 2,
+                                    metric = sleep_metrics[i],
+                                    include_current = TRUE)
+  lag_7_res <- lag_metric_calculator(sleep_met, lagged_days = 6,
+                                    metric = sleep_metrics[i],
+                                    include_current = TRUE)
+  lag_14_res <- lag_metric_calculator(sleep_met, lagged_days = 13,
+                                    metric = sleep_metrics[i],
+                                    include_current = TRUE)
+  
+  # Set names for 3 day
+  names(lag_3_res) <- paste(sleep_metrics[i], "_", names(lag_3_res),sep="")
+  # Set names for 7 day
+  names(lag_7_res) <- paste(sleep_metrics[i], "_", names(lag_7_res),sep="")
+  # Set names for 14 day
+  names(lag_14_res) <- paste(sleep_metrics[i], "_", names(lag_14_res),sep="")
+  
+  if (nrow(sleep_lags) == 0){
+    sleep_lags = cbind.data.frame(lag_3_res, lag_7_res, lag_14_res)
+  } else {
+    sleep_lags = cbind.data.frame(sleep_lags, lag_3_res, lag_7_res, lag_14_res)
+  }
+  
+    
+  
+}
+```
+
+
+```{r}
+dim(sleep_met)
+dim(sleep_admin)
+dim(sleep_lags)
+
+all_whoop_2 <- cbind.data.frame(sleep_admin, sleep_met, sleep_lags)
+
+#Drop naps as only "false"
+all_whoop_2 <- all_whoop_2 %>% select(-nap)
+summary(all_whoop_2)
+
+colnames(all_whoop_2)
+
+```
+Still got to look at HRs and whoop metrics
 
 
 ## Next Ideas: 
