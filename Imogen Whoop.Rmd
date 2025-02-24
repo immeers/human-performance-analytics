@@ -263,7 +263,7 @@ swim_df <- all_swim %>% mutate(Date = str_replace_all(Date, "–\\d{1,2}", ""), 
 imputed <- swim_df %>% mutate(Time = ifelse(Time == "", NA, Time), Event = ifelse(Event == "", NA, Event)) %>% mutate(Season_Improvement = ifelse(!is.na(Time) & is.na(Season_Improvement), 0, Season_Improvement))
 
 head(imputed)
-plot_bar <- imputed %>% filter(!is.na(Event)) %>% mutate(Best = ifelse(Event %in% c("100 Y Free", "50 Y Free", "100 Y Back"), 1, 0))
+plot_bar <- imputed %>% filter(!is.na(Event)) %>% mutate(Best = ifelse(Event %in% c("100 Y Free", "50 Y Free", "100 Y Back", "200 Y Back", "200 Y IM"), 1, 0))
 ggplot(data = plot_bar, aes(x=as.factor(Event), fill = as.factor(Best))) + 
   geom_bar() + 
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
