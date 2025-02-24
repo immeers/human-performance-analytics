@@ -1,13 +1,11 @@
 ---
-title: "Metric Analysis"
+title: "Personal Whoop Analysis: What makes the Optimal Taper?"
 author: "Imogen Meers"
 date: "26/1/24"
-output: html_document
+output: pdf_document
 ---
 
-# Personal Whoop Analysis: What makes the Optimal Taper?
-
-## Motivation
+# Motivation
 
 Taper is one of the hardest but also most important parts of the swimming cycle to execute. Years of training can come to fruition with a good taper, but swimmers often fall short if they "miss" their taper.
 
@@ -15,14 +13,14 @@ This is an important problem to me personally as I am using my own Whoop data fr
 
 Whilst it will be useful to see how Whoop affects taper and competition, it is important to note that this analysis is a small snapshot of my actions that affect my swimming. I am not including injury, illness, nutrition or recovery data, which would help to draw a better picture of my performance. I am, however, hoping that significant changes in these areas will be reflected in my personal metrics and thus be considered.
 
-## Previous Work
+# Previous Work
 
 There have been a number of studies on wearable tech metrics and their accuracy and predictability for factors of performance, recovery and strain. 
 
 One study I found that was particularly interesting and related to my analysis is the thesis of Emily Lundstrom, a Masters student at Penn State University called _Effectiveness of Wearable Technology for Predicting Measures of Metabolism and Performance in Collegiate Division 1 Swimmers_. She found a negative correlation between strain and time trial performance in female swimmers as well as a positive correlation between HRV and suppressed metabolic rate. These are both significant findings when looking at Whoop metrics in swimmers and are similar to what I would expect to find in my own analysis. 
 
 
-## Problem Framing
+# Problem Framing
 
 After an exploratory analysis of the different data sets collected by Whoop, which include physiology, sleep and workouts, I intend to analyse different parts of this problem.
 
@@ -34,7 +32,7 @@ After an exploratory analysis of the different data sets collected by Whoop, whi
   For this, I will extract more data from my swims and look at distribution of splits and overall results for 50 vs 100 and how factors differ between good performances in front-end vs. back-end speed.
 
 
-## Data Overview
+##Data Overview
 
 My data sources will be:
 
@@ -60,7 +58,7 @@ The swimcloud website is also a reliable data source. They report times for all 
 
 Lundstrom, E. (2020). Effectiveness of Wearable Technology for Predicting Measures of Metabolism and Performance in Collegiate Division 1 Swimmers. Master's Thesis, Pennsylvania State University1. Retrieved from Pennsylvania State University Electronic Theses and Dissertations.
 
-## Preliminary EDA
+# Preliminary EDA
 
 Let's load in the packages we are going to use for the analysis:
 
@@ -85,6 +83,7 @@ colnames(plot_data) <- c("cycle_start", "cycle_end", "cycle_tzone", "recovery", 
 summary(plot_data) # Summarise metric data
 ```
 This data has 1477 rows dating from July 2020 to present. It includes general data on physiological cycles including sleep and  daily metrics.
+
 ```{r}
   # Create a mapping of time zone offsets to Olson names
   tzone_mapping <- c(
@@ -211,7 +210,7 @@ melted_data <- plot_data %>% select(-c(cycle_start, cycle_end, sleep_onset )) %>
 
 ## Physiological Metrics over Years
 
-```{r}
+```{r  warning=FALSE}
 
 metric_plot <- melted_data %>% mutate(reference = ifelse(month(wake_onset) == 8, "pre season", ifelse(month(wake_onset) %in% c(5,6,7), "summer", ifelse(month(wake_onset) == 2, "conference", NA))))
 
@@ -251,7 +250,7 @@ all_swim <- read.csv("all_swim_results.csv")
 
 ```
 
-```{r}
+```{r  warning=FALSE}
 swim_df <- all_swim %>% mutate(Date = str_replace_all(Date, "–\\d{1,2}", ""), Results = str_replace_all(Results, "\\[|'|\\]|%|\\+", "")) %>% 
   mutate(Date = mdy(Date)) %>% 
     separate(Results, into = c("1", "2", "3"), sep = "\\), \\(", remove = TRUE) %>% 
@@ -302,7 +301,7 @@ melted_data <- sleep_data %>% select(-c(cycle_start, cycle_end, sleep_onset, nap
 ```
 
 
-```{r}
+```{r  warning=FALSE}
 
 metric_plot <- melted_data %>% mutate(reference = ifelse(month(wake_onset) == 8, "pre season", ifelse(month(wake_onset) %in% c(5,6,7), "summer", ifelse(month(wake_onset) == 2, "conference", NA))))
 
@@ -335,7 +334,7 @@ print(g_metric)
 invert_geom_defaults()
 ```
 ## Sleep on Performance
-```{r}
+```{r warning=FALSE}
 
 ### Sleep
 
@@ -362,7 +361,7 @@ At the highest values of deep and REM sleep, performance either increased the mo
 
 ## Strain on Performance
 
-```{r}
+```{r warning=FALSE}
 ### Strain
 strain_week = plot_data %>% select(wake_onset, day_strain) %>% mutate(week =floor_date(wake_onset, "week")) %>%
   group_by(week) %>%
@@ -390,7 +389,7 @@ When we look at max performance improvement, which is looking at when I do the b
 
 
 ## Pre-Competition Workouts
-```{r}
+```{r warning = FALSE}
 conference_dates = c(
   "Freshman" = "02-25-2021", 
   "Sophomore" = "02-22-2022",
@@ -448,7 +447,7 @@ pre_meet = workout_data %>% na.omit() %>% mutate(conf_date = mdy(conference_date
  
 ```
 
-```{r}
+```{r warning = FALSE}
 
 metrics = c("max_strain", "total_dur")
 
@@ -482,9 +481,10 @@ print(g_preconf)
 # Generate plot
 print(g_preconf1)
 ```
+
 This shows how many workouts changed when approaching two major meets this year. My most successful year, Senior year, I kept at least one of my practices with high intensity and dropped that intensity dramatically with around a week to go. There was a similar pattern with total workout duration per day, but the drop happened early around 10 days previous.
 
-```{r}
+```{r warning = FALSE}
   g_premid <- ggplot(pre_plot[pre_plot$metric == metrics[1] & pre_plot$event == "midseason",], # Set data
               aes(x = days_til, y = value, color = grade) )+ # Set aesthetics
 
@@ -516,6 +516,7 @@ print(g_premid)
 print(g_premid1)
 
 ```
+
 There is a lot less significant pattern approaching mid-season as there is less emphasis on resting for this meet. Interesting my best two years, junior and senior, had completely different approaches to taper.
 
 ## EDA Findings
@@ -543,7 +544,7 @@ Based on my EDA and my knowledge of how I have swam over the years, there are ce
 
 
 
-
+## Top 5 Events
 
 ```{r Get top 5 event results as output for model}
 library(readxl)
@@ -559,7 +560,6 @@ back2 <- back2 %>% select(-X) %>% separate(Time, into = c("Min", "Sec"), sep = "
 
 top5 <- rbind(top5, back2)
 
-top5 %>% ungroup()
 top5 <- top5  %>% group_by(Event) %>% arrange(Event, Date, SwimNum)
 pb = 1000
 pb_col = c() 
@@ -594,23 +594,20 @@ for (i in 1:nrow(top5)) {
   
   
 }
+
 top5$PB = pb_col
 top5$Imp= imp_col
 head(top5)
+
+top5 <- top5 %>% mutate(Tapered = ifelse(str_detect(Meet, "(Conference)|(Invitational)|(3 session 11/20)"), 1, 0), Tapered = ifelse(Meet== "Rice Invitational", 0, Tapered))
+
+
 ```
-To do:
-- derive ac ratios for all zones, strains
-- derive lags for all sleep
-- count number of workouts, mornings in lag
-- run models for all and individual events
-
-- cluster performances by metrics do any performances stand out?
-- lasso correlation between imp and anything?
 
 
-#days until all meets and take 21 or 14?
+# 
 
-## Final Dataframe
+## Final Dataframe Prep
 
 ```{r}
 library(mice)
@@ -629,6 +626,8 @@ all_whoop <- all_whoop %>%
 #Derive some more variables
 all_whoop <- all_whoop %>% arrange(date) %>% mutate(waking_hours = as.numeric(difftime(time1= as.POSIXct(wake_onset), time2 =as.POSIXct(sleep_onset), units = 'hours')))
 
+
+
 ```
 
 ## Imputation
@@ -644,12 +643,17 @@ not_numeric <- all_whoop %>% select_if(~ !is.numeric(.))
 
 correlation_matrix <- cor(numeric, use = "complete.obs")
 which(correlation_matrix == 1, arr.ind = TRUE) #Lets look for perfect correlations
+
+
+#Save for later
+daily_vars = colnames(all_whoop %>% select(-c(cycle_start, cycle_end, sleep_onset, wake_onset, `awake`, `nap`, `days_since`, `sleep_consistency`)))
+
 ```
 
 We can see that sleep consistency and consistency, and awake and awake_dur are perfectly correlated so we don't need both of them. Let's remove sleep consistency
 
 
-```{r}
+```{r  warning=FALSE}
 #Remove sleep consistency
 numeric <- numeric %>% select(-sleep_consistency, -awake)
 
@@ -684,8 +688,18 @@ Now we can create all other derived variables:
 #I want to look at aerobic zones, total_dur, counts and day strain
 #Look over ratios: 3:7, 7:21
 
-met_data <- all_whoop %>% select(zone1, zone2, zone3, zone4, zone5, day_strain, Swimming_count, Dryland_count, total_dur, count_morning, count_afternoon) 
-admin_dat <- all_whoop %>% select(-c(zone1, zone2, zone3, zone4, zone5, day_strain, Swimming_count, Dryland_count, total_dur, count_morning, count_afternoon)) %>% rename(days = days_since)
+#met_data <- whoop_imputed %>% select(zone1, zone2, zone3, zone4, zone5, day_strain, Swimming_count, Dryland_count, total_dur, count_morning, count_afternoon) 
+
+whoop_imputed <- whoop_imputed %>% select(-nap)
+met_data <- whoop_imputed %>% select(-c(cycle_start, cycle_end, sleep_onset, wake_onset, date, days_since, grade))
+
+#admin_dat <- whoop_imputed %>% select(-c(zone1, zone2, zone3, zone4, zone5, day_strain, Swimming_count, Dryland_count, total_dur, count_morning, count_afternoon)) %>% rename(days = days_since)
+
+
+admin_dat <- whoop_imputed %>% select(c(cycle_start, cycle_end, sleep_onset, wake_onset, date,days_since, grade))%>% rename(days = days_since)
+
+dim(admin_dat)
+dim(met_data)
 
 ```
 
@@ -784,28 +798,39 @@ ac_ratio <- function(met_data, admin_dat, met, days_1, days_2){
 
 ```{r}
 # Create empty data frames to store our results
-sum_7_res <- sum_3_res <- sum_14_res <- ac_7_21_res <- ac_3_7_res <-  as.data.frame(matrix(NA, nrow = nrow(met_data), ncol = ncol(met_data)))
+sum_21_res <- sum_2_res <- sum_7_res <- sum_3_res <- sum_14_res <- ac_7_21_res <- ac_3_7_res <- ac_28_56_res <-  as.data.frame(matrix(NA, nrow = nrow(met_data), ncol = ncol(met_data)))
 
 
 # For each column in the gps data
 for(i in 1:ncol(met_data)){
   # Calculate the sum over 3 days
+  sum_2_res[,i] <- sum_days(met_data, # Set GPS data
+                            admin_dat,  # Set Admin data
+                            met = names(met_data)[i], # Set metric to use
+                            days = 2) # Set window size
+  
+  
   sum_3_res[,i] <- sum_days(met_data, # Set GPS data
                             admin_dat,  # Set Admin data
                             met = names(met_data)[i], # Set metric to use
-                            days = 7) # Set window size
+                            days = 3) # Set window size
   
   # Calculate the sum over 7 days
   sum_7_res[,i] <- sum_days(met_data, # Set GPS data
                              admin_dat,  # Set admin data
                              met = names(met_data)[i], # Set metric to use
-                             days = 28) # Set window size
+                             days = 7) # Set window size
   
   # Calculate the sum over 14 days
   sum_14_res[,i] <- sum_days(met_data, # Set GPS data
                              admin_dat, # Set admin data
                              met = names(met_data)[i], # Set metric to use
-                             days = 56) # Set window size
+                             days = 14) # Set window size
+  
+  sum_21_res[,i] <- sum_days(met_data, # Set GPS data
+                            admin_dat,  # Set Admin data
+                            met = names(met_data)[i], # Set metric to use
+                            days = 21) # Set window size
   
   # Calculate the A:C ratio for 7:21
   ac_7_21_res[,i] <- ac_ratio(met_data, # Set GPS data
@@ -819,7 +844,14 @@ for(i in 1:ncol(met_data)){
                                admin_dat, # Set admin data
                                met = names(met_data)[i], # Set metric to use
                                days_1 = 3, # Set acute window
-                               days_2 = 3) # Set chronic window
+                               days_2 = 7) # Set chronic window
+  
+  # Calculate the A:C ratio for 3:7
+  ac_28_56_res[,i] <- ac_ratio(met_data, # Set GPS data
+                               admin_dat, # Set admin data
+                               met = names(met_data)[i], # Set metric to use
+                               days_1 = 28, # Set acute window
+                               days_2 = 58) # Set chronic window
   
 }
 ```
@@ -827,24 +859,29 @@ for(i in 1:ncol(met_data)){
 Next up we need to fix the names of the result data frames we have calculated so that we can tell which metric is which:
 
 ```{r}
+# Set names for 2 day sums
+names(sum_2_res) <- paste(names(met_data), "_sum_2_days", sep="")
+# Set names for 21 day sums
+names(sum_21_res) <- paste(names(met_data), "_sum_21_days", sep="")
 # Set names for 7 day sums
 names(sum_7_res) <- paste(names(met_data), "_sum_7_days", sep="")
-# Set names for 28 day sums
+# Set names for 14 day sums
 names(sum_14_res) <- paste(names(met_data), "_sum_14_days", sep="")
-# Set names for 56 day sums
+# Set names for 3 day sums
 names(sum_3_res) <- paste(names(met_data), "_sum_3_days", sep="")
 # Set names for A:C 7:21
 names(ac_7_21_res) <- paste(names(met_data), "_ac_7_21", sep="")
 # Set names for A:C 28:56
 names(ac_3_7_res) <- paste(names(met_data), "_ac_3_7", sep="")
-
+# Set names for A:C 28:56
+names(ac_28_56_res) <- paste(names(met_data), "_ac_28_56", sep="")
 ```
 
 Finally we want to rejoin all our data together so that we have a single data frame to work with:
 
 ```{r}
 # Join data together
-met_dat <- cbind.data.frame(met_data, sum_3_res, sum_7_res, sum_14_res, ac_3_7_res, ac_7_21_res)
+met_dat <- cbind.data.frame(met_data, sum_2_res,sum_3_res, sum_7_res, sum_14_res,sum_21_res, ac_3_7_res, ac_7_21_res, ac_28_56_res)
 
 dim(met_dat)
 dim(admin_dat)
@@ -854,20 +891,24 @@ all_whoop_1 <- cbind.data.frame(admin_dat, met_dat)
 ```
 
 
-### Sleep Lag
-
-in_bed_dur, awake_dur, asleep_dur, deep_sleep, rem, sleep_need, sleep_debt, sleep_performance, waking_hours
-
+### Lags
 
 
 ```{r}
-sleep_met <- all_whoop_1 %>% select(in_bed_dur, awake_dur, asleep_dur, deep_sleep, rem, sleep_need, sleep_debt, sleep_performance, waking_hours)
+# sleep_met <- all_whoop_1 %>% select(in_bed_dur, awake_dur, asleep_dur, deep_sleep, rem, sleep_need, sleep_debt, sleep_performance, waking_hours)
+# 
+# sleep_admin <- all_whoop_1 %>% select(-c(in_bed_dur, awake_dur, asleep_dur, deep_sleep, rem, sleep_need, sleep_debt, sleep_performance, waking_hours))
 
-sleep_admin <- all_whoop_1 %>% select(-c(in_bed_dur, awake_dur, asleep_dur, deep_sleep, rem, sleep_need, sleep_debt, sleep_performance, waking_hours))
+#use whoop_imputed not whoop_all_1, we dont want to lag ac ratios
+lag_met <- whoop_imputed %>% select(-c(cycle_start, cycle_end, sleep_onset, wake_onset, date, days_since, grade))
+
+lag_admin <- whoop_imputed %>% select(c(cycle_start, cycle_end, sleep_onset, wake_onset, date,days_since, grade))
+
 ```
 
 
 ```{r}
+library(matrixStats)
 
 lag_metric_calculator <- function(metric_data, lagged_days = 3,
                                   metric = "in_bed_dur",
@@ -930,37 +971,57 @@ lag_metric_calculator <- function(metric_data, lagged_days = 3,
 }
 ```
 
-```{r, eval=FALSE}
+```{r}
 
-sleep_metrics = c('in_bed_dur', 'awake_dur', 'asleep_dur', 'deep_sleep', 'rem', 'sleep_need', 'sleep_debt', 'sleep_performance', 'waking_hours')
-sleep_lags = data.frame()
+# sleep_metrics = c('in_bed_dur', 'awake_dur', 'asleep_dur', 'deep_sleep', 'rem', 'sleep_need', 'sleep_debt', 'sleep_performance', 'waking_hours')
+# sleep_lags = data.frame()
+# 
+# lag_3_res <- lag_7_res <- lag_14_res <-  as.data.frame(matrix(NA, nrow = nrow(sleep_met), ncol = 5))
 
-lag_3_res <- lag_7_res <- lag_14_res <-  as.data.frame(matrix(NA, nrow = nrow(sleep_met), ncol = 5))
 
-for (i in seq(1:length(sleep_metrics))){
-  lag_3_res <- lag_7_res <- lag_14_res <-  as.data.frame(matrix(NA, nrow = nrow(sleep_met), ncol = 5))
+lag_3_res <- lag_7_res <- lag_14_res <-  lag_2_res <-  lag_10_res <- lag_21_res <-  as.data.frame(matrix(NA, nrow = nrow(lag_met), ncol = 4))
+lags = data.frame()
 
-  lag_3_res <- lag_metric_calculator(sleep_met, lagged_days = 2,
-                                    metric = sleep_metrics[i],
+
+for (i in seq(1:ncol(lag_met))){
+  lag_3_res <- lag_7_res <- lag_14_res <-  lag_2_res <-  lag_10_res <- lag_21_res <- as.data.frame(matrix(NA, nrow = nrow(lag_met), ncol = 4))
+
+  lag_3_res <- lag_metric_calculator(lag_met, lagged_days = 2,
+                                    metric = colnames(lag_met)[i],
                                     include_current = TRUE)
-  lag_7_res <- lag_metric_calculator(sleep_met, lagged_days = 6,
-                                    metric = sleep_metrics[i],
+  lag_7_res <- lag_metric_calculator(lag_met, lagged_days = 6,
+                                    metric = colnames(lag_met)[i],
                                     include_current = TRUE)
-  lag_14_res <- lag_metric_calculator(sleep_met, lagged_days = 13,
-                                    metric = sleep_metrics[i],
+  lag_14_res <- lag_metric_calculator(lag_met, lagged_days = 13,
+                                    metric = colnames(lag_met)[i],
                                     include_current = TRUE)
-  
+  lag_2_res <- lag_metric_calculator(lag_met, lagged_days = 1,
+                                    metric = colnames(lag_met)[i],
+                                    include_current = TRUE)
+  lag_10_res <- lag_metric_calculator(lag_met, lagged_days = 9,
+                                    metric = colnames(lag_met)[i],
+                                    include_current = TRUE)
+  lag_21_res <- lag_metric_calculator(lag_met, lagged_days = 20,
+                                    metric = colnames(lag_met)[i],
+                                    include_current = TRUE)
+
   # Set names for 3 day
-  names(lag_3_res) <- paste(sleep_metrics[i], "_", names(lag_3_res),sep="")
+  names(lag_3_res) <- paste( colnames(lag_met)[i], "_", names(lag_3_res),sep="")
   # Set names for 7 day
-  names(lag_7_res) <- paste(sleep_metrics[i], "_", names(lag_7_res),sep="")
+  names(lag_7_res) <- paste( colnames(lag_met)[i], "_", names(lag_7_res),sep="")
   # Set names for 14 day
-  names(lag_14_res) <- paste(sleep_metrics[i], "_", names(lag_14_res),sep="")
+  names(lag_14_res) <- paste( colnames(lag_met)[i], "_", names(lag_14_res),sep="")
+  # Set names for 2 day
+  names(lag_2_res) <- paste( colnames(lag_met)[i], "_", names(lag_3_res),sep="")
+  # Set names for 10 day
+  names(lag_10_res) <- paste( colnames(lag_met)[i], "_", names(lag_7_res),sep="")
+  # Set names for 21 day
+  names(lag_21_res) <- paste( colnames(lag_met)[i], "_", names(lag_14_res),sep="")
   
-  if (nrow(sleep_lags) == 0){
-    sleep_lags = cbind.data.frame(lag_3_res, lag_7_res, lag_14_res)
+  if (nrow(lags) == 0){
+    lags = cbind.data.frame(lag_3_res, lag_7_res, lag_14_res, lag_2_res, lag_10_res, lag_21_res)
   } else {
-    sleep_lags = cbind.data.frame(sleep_lags, lag_3_res, lag_7_res, lag_14_res)
+    lags = cbind.data.frame(lags, lag_3_res, lag_7_res, lag_14_res, lag_2_res, lag_10_res, lag_21_res)
   }
   
     
@@ -970,24 +1031,635 @@ for (i in seq(1:length(sleep_metrics))){
 
 
 ```{r}
-dim(sleep_met)
-dim(sleep_admin)
-dim(sleep_lags)
+# dim(sleep_met)
+# dim(sleep_admin)
+# dim(sleep_lags)
 
-all_whoop_2 <- cbind.data.frame(sleep_admin, sleep_met, sleep_lags)
+#all_whoop_2 <- cbind.data.frame(sleep_admin, sleep_met, sleep_lags)
 
-#Drop naps as only "false"
-all_whoop_2 <- all_whoop_2 %>% select(-nap)
-summary(all_whoop_2)
+dim(lag_admin)
+dim(lag_met)
+dim(lags)
 
-colnames(all_whoop_2)
+all_whoop_2 <- cbind.data.frame(all_whoop_1, lags)
+dim(all_whoop_2)
+
+#sum(is.na(all_whoop_2))
+
+#colnames(all_whoop_2)
+
+# save(all_whoop_2, all_whoop_1, lags, whoop_imputed, file = "post_sleep.rda")
+# load("post_sleep.rda")
 
 ```
 Still got to look at HRs and whoop metrics
+```{r}
+library(naniar)
+vis_miss(all_whoop_2[,50:100])
+
+nrow(all_whoop_2[is.na(all_whoop_2$awake_dur_sum_3_days),]) #the missing data is just a few rows at the start of each season-- let's get rid of those
+
+all_whoop_2 <- all_whoop_2 %>% na.omit()
+sum(is.na(all_whoop_2))
+```
+
+### Date-Derived
+```{r Date}
+
+#Months to be categorical to see if a specific month has an impact
+all_whoop_3 <- all_whoop_2 %>% mutate(month = as.character(month(date, label=TRUE)), 
+                                    dow = wday(date),
+                                    wake_up_hour = as.numeric(format(wake_onset, "%H")) + as.numeric(format(wake_onset, "%M"))/60,
+                                    night_before_bed_time = as.numeric(format(sleep_onset, "%H")) + as.numeric(format(sleep_onset, "%M"))/60)#no need to lag, already lagged
+
+#Now we can remove all the date specific metrics
+all_whoop_3 <- all_whoop_3 %>% select(-c(cycle_start, cycle_end, wake_onset, sleep_onset))
 
 
-## Next Ideas: 
+names(all_whoop_3)[sapply(all_whoop_3, is.character)]
+```
 
-cumulative sum of mornings/swims
-a:C ratio for anything, aerobic zones 7:28
-weekend vs weekday
+Now we have all whoop metrics prepped and ready for model. We can start adding outcome variables and any metrics to do with my swims. These will include a days_until var which indicates days until the closest meet
+
+
+
+```{r}
+library(tidyr)
+
+
+duplicated_dates <- top5 %>%
+  mutate(date = lapply(Date, function(x) x - 0:20),) %>%  # Create sequences of 0 to 21*86400 seconds (seconds in a day)
+  unnest(date) %>% # Expand into multiple rows
+  mutate(days_until = (as.numeric(difftime(Date, date, units = "days")))) %>% data.frame() %>% rename(Meet_Date = Date)
+
+duplicated_dates$date = as.Date(duplicated_dates$date)
+
+merged_df = merge(duplicated_dates, all_whoop_3, by = "date") %>% mutate(PB = as.integer(PB), Tapered = as.integer(Tapered)) %>% arrange(date)
+
+#We now have duplicated rows up to days - 20 from a meet. This is because some meets I take my whoop off before I start. We want to keep the min value for days_until (closest whoop metric to the event)
+
+filtered_df <- merged_df %>% group_by(Event, Meet, Time) %>% filter(days_until == min(days_until)) %>% ungroup()
+
+dim(top5)[1] == dim(filtered_df)[1]
+
+#daily_vars = colnames(merged_df[,c(11:37, 93:101)])
+
+final_df = filtered_df %>% select(-c(date,days_until, Meet_Date,Meet, all_of(daily_vars))) #remove specific date, meet info and daily vars
+
+filtered_df[filtered_df$Meet == "Sterkel Classic",]$days_until
+
+head(final_df)
+```
+# Models
+Now let's think about outcome variables. For the overall model I will use either PB or Imp
+
+a. PB (1/0)- for this I will take out Time and Imp as these were used to calculate
+b. Imp (%)- for this I will take out Time and PB as these were used to calculate
+
+## Overall PB XGB
+First, a logistic XGB with PB as the outcome
+```{r}
+library(fastDummies)
+char_cols = names(final_df)[sapply(final_df, is.character)]
+final_w_dummies <- dummy_cols(final_df, select_columns = c(char_cols), remove_selected_columns = TRUE) %>% data.frame()
+
+save(final_w_dummies, final_df, file = "premodel.rda")
+
+
+```
+
+```{r eval=FALSE, echo=FALSE}
+load("premodel.rda")
+```
+
+
+
+```{r}
+library(xgboost)
+library(caret) 
+
+
+
+set.seed(0)
+
+parts = createDataPartition(final_w_dummies$PB, p = .8, list = F)
+
+label_1 = final_w_dummies %>% select(PB) 
+premodel_1 = data.matrix(final_w_dummies %>% select(-Time, -Imp, -PB))
+
+
+trainx = premodel_1[parts, ]
+trainy = label_1[parts, ]
+testx = premodel_1[-parts, ]
+testy = label_1[-parts, ]
+
+
+dtrain_1 <- xgb.DMatrix(data = as.matrix(trainx), label = trainy)
+dtest_1 <- xgb.DMatrix(data = as.matrix(testx), label = testy)
+all_1 <- xgb.DMatrix(data = as.matrix(premodel_1), label = label_1$PB)
+# Create test data
+
+#dtest_1 <- xgb.DMatrix(data = as.matrix(test_dat[,c(8:11,17:42)]), label = test_inj)
+
+
+fit_1 <- xgboost(dtrain_1,  # Set data set to use
+                 nrounds = 100, # Set number of rounds
+               
+               verbose = 1, # 1 - Prints out fit
+                print_every_n = 20, # Prints out result every 20th iteration
+               
+               objective = "binary:logistic", # Set objective
+               eval_metric = "auc",
+               eval_metric = "error")
+
+
+
+boost_preds_1 <- predict(fit_1, dtest_1) # Create predictions for xgboost model
+
+# Convert predictions to classes, using optimal cut-off
+boost_pred_class <- rep(0, length(boost_preds_1))
+boost_pred_class[boost_preds_1 >= 0.5] <- 1
+
+t <- table(boost_pred_class, testy) # Create table
+confusionMatrix(t, positive = "1") # Produce confusion matrix
+```
+
+We will add a weight vector as we can see PB = 1 is a large minority class with only ~10% of swims being a PB
+```{r}
+mean(label_1$PB)
+weight_vec <- rep(1, length(trainy))
+
+#Assign higher weight to PBs
+weight_vec[trainy == 1] <- length(trainy)/sum(trainy == 1)
+
+
+fit_2 <- xgboost(dtrain_1,  # Set data set to use
+                 nrounds = 100, # Set number of rounds
+               
+               verbose = 1, # 1 - Prints out fit
+                print_every_n = 20, # Prints out result every 20th iteration
+               
+               objective = "binary:logistic", # Set objective
+               eval_metric = "auc",
+               eval_metric = "error",
+               
+               weight = weight_vec)
+
+
+
+boost_preds_2 <- predict(fit_2, dtest_1) # Create predictions for xgboost model
+
+#Create new cut_off
+cut_off <- sum(trainy== 1)/length(trainy)
+
+
+# Convert predictions to classes, using optimal cut-off
+boost_pred_class <- rep(0, length(boost_preds_2))
+boost_pred_class[boost_preds_2 >= cut_off] <- 1
+
+t <- table(boost_pred_class, testy) # Create table
+confusionMatrix(t, positive = "1") # Produce confusion matrix
+
+```
+This is a better model as it has a higher balanced accuracy and we got better predictions for a PB which is what is most important.
+
+Now retrain with all data.
+
+
+
+```{r}
+
+weight_vec <- rep(1, length(label_1$PB))
+
+#Assign higher weight to PBs
+weight_vec[label_1$PB == 1] <- length(label_1$PB)/sum(label_1$PB == 1)
+
+fit_1 <- xgboost(all_1,  # Set data set to use
+                 nrounds = 100, # Set number of rounds
+               
+               verbose = 1, # 1 - Prints out fit
+                print_every_n = 20, # Prints out result every 20th iteration
+               
+               objective = "binary:logistic", # Set objective
+               eval_metric = "auc",
+               eval_metric = "error",
+               weight = weight_vec)
+```
+
+
+```{r}
+
+source("a_insights_shap_functions.r")
+# Calculate SHAP importance
+shap_result_1 <- shap.score.rank(xgb_model = fit_1, 
+                X_train =as.matrix(premodel_1),
+                shap_approx = F)
+
+
+# Calculate data for SHAP plot
+shap_long_1 = shap.prep(shap = shap_result_1,
+                           X_train = as.matrix(premodel_1), 
+                           top_n = 20)
+# Generate SHAP plot
+plot.shap.summary(data_long = shap_long_1)
+```
+
+
+### Insights
+
+
+For my overall PB model, the most important factor was the minimum value of my day strain over the previous 14 days. This would describe my lightest/recovery days for the 14 days leading into competition. Interestingly, both very high and very low values of this variable have strong predictive power when predicting PB but perhaps in the opposite way you would expect. High values of min day strain over 14 days, contribute to "higher values" of PBs (a PB) and low values of min day strain over 14 days, contribute to "lower values" of PBs. This perhaps indicates that I need to keep my recovery days still somewhat intense, which is interesting as you would expect that low intensity would lead to lower fatigue and perhaps better performance.
+
+This is also somewhat reflected in min value of max HR of the 14 days preceding. Minimum max HR is similar to day strain in that I should keep my maximum HR somewhat high over the two weeks leading into a meet. 
+
+The maximum value of zone 2 swimming 3 days preceding is inversely proportional meaning the less zone 2 swimming I do in the days immediately prior to a  meet, the higher value of "PBs". This is not surprising to me, as traditionally this is a maintenance zone and you don't need to be doing lots of low intensity swimming leading a meet, you need to keep it short and fast.
+
+Unsurprisingly when looking at sleep, better sleep scores in days preceding meets led to better performance. The most notable being sum of REM sleep 2 days before as well as mean sleep efficiency 7 days before. Increased REM sleep can lead to improved muscle recovery and cognitive function, both of which would be essential to performing at your peak. Sleep efficiency is a Whoop derived metric so whilst we do not know its exact formation, it is likely it also considers REM sleep.
+
+
+### Volcano
+```{r}
+# Extract SHAP values from SHAP result for the first model 
+shap_data <- as.data.frame(shap_result_1$shap_score)
+# Extract variable names from the SHAP data
+vars <- names(shap_data)
+# Create result matrix to store results
+res_mat <- as.data.frame(matrix(NA, nrow = length(vars), ncol = 4))
+# Scale results
+s_train <- scale(premodel_1)
+#For each variable
+for(i in 1:length(vars)){
+  # Calculate mean SHAP score for PBs
+  res_mat[i,1] <- mean(shap_data[label_1$PB == 1, vars[i]])
+  # Calcualte mean SHAP score for no PBs
+  res_mat[i,2] <- mean(shap_data[label_1$PB == 0 , vars[i]])
+  # Calculate mean scaled variable value for PBs
+  res_mat[i,3] <- mean(s_train[label_1$PB == 1, vars[i]])
+  # Calcualte mean scaled variable value for no PBs
+  res_mat[i,4] <- mean(s_train[label_1$PB == 0 , vars[i]])
+}
+
+# Create column of variables
+res_mat$var <- vars
+```
+
+
+```{r}
+# Calculate difference between PB and no PBS samples for SHAP score
+res_mat$shap_diff <- res_mat[,1] - res_mat[,2]
+# Calculate difference between PB and no PB samples for scaled variables
+res_mat$met_diff <- res_mat[,3] - res_mat[,4]
+
+# Create color column as absolute value of SHAP differences and metric differences
+res_mat$color_scale <- abs(res_mat$shap_diff) + abs(res_mat$met_diff)
+```
+
+
+We also want to label important variables in the plot. For this we do not want to label unimportant variables. So we will select variables which have:
+
+A SHAP difference greater than 0.5
+A SHAP difference greater than 0.1 and a metric difference greater than 1
+A metric difference greater than 2
+
+```{r}
+# Create binary selected variable indicator
+sel_vars <- (abs(res_mat$shap_diff) > 0.5) | 
+            ((abs(res_mat$met_diff) > 1) & (abs(res_mat$shap_diff) > 0.5)) |
+            (abs(res_mat$met_diff) > 2)
+```
+
+```{r  warning=FALSE}
+library(ggrepel)
+# Create plot
+g_5 <- ggplot(res_mat, # Set dataset
+              aes(x = met_diff, y = shap_diff, color= color_scale)) + # Set aesthetics
+  geom_point() + # Add geom point for scatter plot
+  theme(axis.line = element_line(colour = "black"), # Set axis line as black
+        panel.grid.major = element_blank(), # Remove grid
+        panel.grid.minor = element_blank(), # Remove grid
+        panel.border = element_blank(), # Remove grid
+        panel.background = element_blank()) + # Remove grid 
+  labs(x = "Difference in scaled values", # Add labels to plot
+       y = "Difference in SHAP values",
+       title = "Volcano Plot - PB Variables") +
+  geom_text_repel(data = res_mat[sel_vars,] , # Add labels to selected points using test_repel
+                  aes(label = var, x = met_diff, y = shap_diff),
+                  color = "white", inherit.aes = FALSE,
+                  size =3) +
+  scale_color_gradient(low = "red", # Scale color gradient
+                        high = "yellow",
+                        aesthetics = "colour") +
+  dark_theme_bw() + # Dark theme
+  guides(color = FALSE) # Turn off color legend
+
+
+g_5
+```
+
+
+A different visualisation shows the same variables are important in making this prediction.
+
+
+## Overall Improvement XGB
+
+Now let's try on % Imp
+```{r warning=FALSE}
+
+label_1 = final_w_dummies %>% select(Imp) 
+premodel_1 = data.matrix(final_w_dummies %>% select(-Time, -Imp, -PB))
+
+trainx = premodel_1[parts, ]
+trainy = label_1[parts, ]
+testx = premodel_1[-parts, ]
+testy = label_1[-parts, ]
+
+dtrain_1 <- xgb.DMatrix(data = as.matrix(trainx), label = trainy)
+dtest_1 <- xgb.DMatrix(data = as.matrix(testx), label = testy)
+all_1 <- xgb.DMatrix(data = as.matrix(premodel_1), label = label_1$Imp)
+
+
+#dtest_1 <- xgb.DMatrix(data = as.matrix(test_dat[,c(8:11,17:42)]), label = test_inj)
+
+
+fit_2 <- xgboost(all_1,  # Set data set to use
+                 nrounds = 100, # Set number of rounds
+               
+               verbose = 1, # 1 - Prints out fit
+                print_every_n = 20) # Prints out result every 20th iteration
+               
+               # eval_metric = "auc",
+               # eval_metric = "error")
+
+```
+```{r}
+# Calculate SHAP importance
+shap_result_2 <- shap.score.rank(xgb_model = fit_2, 
+                X_train =as.matrix(premodel_1),
+                shap_approx = F)
+
+
+# Calculate data for SHAP plot
+shap_long_2 = shap.prep(shap = shap_result_2,
+                           X_train = as.matrix(premodel_1), 
+                           top_n = 20)
+# Generate SHAP plot
+plot.shap.summary(data_long = shap_long_2)
+```
+
+### Insights
+
+
+I think this model is a little less useful than the previous one with the logistic output as we can see less segmentation between variables dictating "good" and "bad" performance, which makes sense as this response variable is % improvement which is on a scale.
+
+The most important factor here is the logistic variable "Tapered". This is exactly what we'd expect as it shows 1 at target and championship meets where we would expect to drop the most time. This is somewhat promising that our current taper is effective.
+
+From this SHAP, the variables I want to analyse that show divide between time drops and time adds are sleep debt and in bed duration, swim counts and zone 1 swimming.
+
+The sleep variables, sleep debt 7:21 AC ratio and max duration in bed for 3 days preceding show sleep behaviour immediately prior to competition. When 7:21 sleep debt is less then there are higher values of % improvement and when max duration in bed 3 days prior to competition is low, I tend to see reduced performance. This follows our previous model that sleep immediately prior to competition is important for me.
+
+For the swim counts AC ratio 7:21, it shows that when this value is low then there is increased % improvement meaning that the week following my competition should have fewer training sessions than than 2 and 3 weeks out.
+
+For zone 1 swimming, which is similar to zone 2 and for maintenance and described as low intensity aerobic, I see marginal improvement when the max value for this is lower over the 3 days preceding competition. This follows our previous model that described a similar pattern for zone 2, indicating that I do not need a lot of slow, aerobic swimming immediately prior to meets.
+
+
+
+```{r}
+top100s <- final_df %>% filter(Event == "100 Y Back" | Event == "100 Y Free") %>% select(-Event)
+top200s <- final_df %>% filter(Event == "200 Y IM" | Event == "200 Y Back") %>% select(-Event)
+top50 <- final_df %>% filter(Event == "50 Y Free") %>% select(-Event)
+top_free <- final_df %>% filter(Event == "50 Y Free" | Event == "100 Y Free") %>% select(-Event)
+  
+```
+
+## 50s Imp XGB
+
+```{r 50s Model}
+
+label_50 = top50 %>% select(Imp) 
+premodel_50 = data.matrix(top50 %>% select(-Time, -Imp, -PB))
+all_50 <- xgb.DMatrix(data = as.matrix(premodel_50), label = label_50$Imp)
+# Create test data
+
+#dtest_1 <- xgb.DMatrix(data = as.matrix(test_dat[,c(8:11,17:42)]), label = test_inj)
+
+
+fit_50 <- xgboost(all_50,  # Set data set to use
+                 nrounds = 100, # Set number of rounds
+               
+               verbose = 1, # 1 - Prints out fit
+                print_every_n = 20) # Prints out result every 20th iteration
+               # 
+               # eval_metric = "auc",
+               # eval_metric = "error")
+```
+```{r}
+# Calculate SHAP importance
+shap_result_50 <- shap.score.rank(xgb_model = fit_50, 
+                X_train =as.matrix(premodel_50),
+                shap_approx = F)
+
+
+# Calculate data for SHAP plot
+shap_long_50 = shap.prep(shap = shap_result_50,
+                           X_train = as.matrix(premodel_50), 
+                           top_n = 20)
+# Generate SHAP plot
+plot.shap.summary(data_long = shap_long_50)
+```
+
+#### Insights
+
+
+For the 50 (sprint event), the variables that have a positive correlation with % Improvement are:
+
+- min REM sleep 2 weeks preceding (weakly)
+
+The variables that have a negative correlation are:
+
+- sum of light sleep in the 3 days preceding
+- sleep debt 7:21 AC ratio
+- mean number of swims 3 days preceding 
+
+## 100s Imp XGB
+
+```{r 100s Model}
+
+label_100 = top100s %>% select(Imp) 
+premodel_100 = data.matrix(top100s %>% select(-Time, -Imp, -PB))
+all_100 <- xgb.DMatrix(data = as.matrix(premodel_100), label = label_100$Imp)
+# Create test data
+
+#dtest_1 <- xgb.DMatrix(data = as.matrix(test_dat[,c(8:11,17:42)]), label = test_inj)
+
+
+fit_100 <- xgboost(all_100,  # Set data set to use
+                 nrounds = 100, # Set number of rounds
+               
+               verbose = 1, # 1 - Prints out fit
+                print_every_n = 20) # Prints out result every 20th iteration
+               
+               # eval_metric = "auc",
+               # eval_metric = "error")
+```
+```{r}
+# Calculate SHAP importance
+shap_result_100 <- shap.score.rank(xgb_model = fit_100, 
+                X_train =as.matrix(premodel_100),
+                shap_approx = F)
+
+
+# Calculate data for SHAP plot
+shap_long_100 = shap.prep(shap = shap_result_100,
+                           X_train = as.matrix(premodel_100), 
+                           top_n = 20)
+# Generate SHAP plot
+plot.shap.summary(data_long = shap_long_100)
+```
+
+#### Insights
+
+
+For the 100 (sprint event that requires a little more aerobic capacity than the 50), the variables that have a positive correlation with % Improvement are:
+
+- maximum day strain 14 days preceding (weakly)
+
+The variables that have a negative correlation are:
+
+- total zone 4 swimming 3 days preceding (weakly)
+- zone 4 AC ratio 7:21
+- mean value of zone 2 swimming for 3 days preceding
+- number of morning swims AC ratio 7:21
+
+Nearly all important variables here are training related and indicate that as expected I need less aerobic swimming immediately before competition. But also need to reduce zone 4, most intense and lactate building, in the last week in comparison to 3 and 2 weeks out. With that I also need to reduce the number of morning swims in the week preceding a meet.
+## 200s Imp XGB
+
+```{r 200s Model}
+
+label_200 = top200s %>% select(Imp) 
+premodel_200 = data.matrix(top200s %>% select(-Time, -Imp, -PB))
+all_200 <- xgb.DMatrix(data = as.matrix(premodel_200), label = label_200$Imp)
+# Create test data
+
+#dtest_1 <- xgb.DMatrix(data = as.matrix(test_dat[,c(8:11,17:42)]), label = test_inj)
+
+
+fit_200 <- xgboost(all_200,  # Set data set to use
+                 nrounds = 200, # Set number of rounds
+               
+               verbose = 1, # 1 - Prints out fit
+                print_every_n = 20) # Prints out result every 20th iteration
+               
+               # eval_metric = "auc",
+               # eval_metric = "error")
+```
+```{r}
+# Calculate SHAP importance
+shap_result_200 <- shap.score.rank(xgb_model = fit_200, 
+                X_train =as.matrix(premodel_200),
+                shap_approx = F)
+
+
+# Calculate data for SHAP plot
+shap_long_200 = shap.prep(shap = shap_result_200,
+                           X_train = as.matrix(premodel_200), 
+                           top_n = 20)
+# Generate SHAP plot
+plot.shap.summary(data_long = shap_long_200)
+```
+
+#### Insights
+
+
+For the 200 (my most aerobic event), the variables that have a positive correlation with % Improvement are:
+
+- sum of sleep performance 2 days preceding
+- mean sleep performance 3 days preceding
+- minimum value of light sleep 3 days preceding
+- Taper or championship meets
+
+The variables that have a negative correlation are:
+
+- minimum value of sleep performance 7 days preceding
+- swim number (the number of times I swam the same event at the same meet)
+- mean value of sleep performance 7 days preceding
+
+Interestingly, nearly all performance factors here are sleep related and very few are related to training approach.
+
+## Free Imp XGB
+```{r free Model}
+
+label_f = top_free %>% select(Imp) 
+premodel_f = data.matrix(top_free %>% select(-Time, -Imp, -PB))
+all_f <- xgb.DMatrix(data = as.matrix(premodel_f), label = label_f$Imp)
+# Create test data
+
+#dtest_1 <- xgb.DMatrix(data = as.matrix(test_dat[,c(8:11,17:42)]), label = test_inj)
+
+
+fit_f <- xgboost(all_f,  # Set data set to use
+                 nrounds = 100, # Set number of rounds
+               
+               verbose = 1, # 1 - Prints out fit
+                print_every_n = 20) # Prints out result every 20th iteration
+               # 
+               # eval_metric = "auc",
+               # eval_metric = "error")
+```
+```{r }
+# Calculate SHAP importance
+shap_result_f <- shap.score.rank(xgb_model = fit_f, 
+                X_train =as.matrix(premodel_f),
+                shap_approx = F)
+
+
+# Calculate data for SHAP plot
+shap_long_f = shap.prep(shap = shap_result_f,
+                           X_train = as.matrix(premodel_f), 
+                           top_n = 20)
+# Generate SHAP plot
+plot.shap.summary(data_long = shap_long_f)
+```
+
+#### Insights
+
+
+For freestyle events, the variables that have a positive correlation with % Improvement are:
+
+- sum of sleep performance 2 days preceding
+- mean sleep performance 3 days preceding
+- minimum value of light sleep 3 days preceding
+- Taper or championship meets
+
+The variables that have a negative correlation are:
+
+- minimum value of sleep performance 7 days preceding
+- swim number (the number of times I swam the same event at the same meet)
+- mean value of sleep performance 7 days preceding
+
+Interestingly, nearly all performance factors here are sleep related and very few are related to training approach.
+
+
+
+# Limitations
+
+Overall, I think this was a successful exploratory study into myself and my performance based on Whoop metrics. However there were some limitations that I did my best to rectify.
+
+Firstly, I do not have 100% complete Whoop data for reasons such as my Whoop dying or getting lost and most importantly, sometimes I remove it in the lead up to competitions to ensure the number don't affect my mindset. This caused some problems as it meant I didn't always have metric data on the day of competitions to join with race day. To overcome this I tracked back 20 days from each competition and joined with the minimum value of "days_until" meaning that I used the most recent data for each competition I had.
+
+Secondly, there was a large imbalance in positive vs negative response variables for some of my models as generally in swimming you target 2-3 events per year and only expect to peak/PB at them. For this, I tried to adjust the weight vector and cut off value accordingly to accomodate for the lack of PBs in my data set.
+
+Lastly, Whoop's derived metrics adapt to my current training period so it is hard to compare "strain" for this year at Notre Dame to my previous years at Rice as my training has changed to over the past year my resilience to different styles of training will also change.
+
+
+
+# Conclusion and Application
+
+Firstly, I would make an effort to keep my recovery days more intense for the two weeks leading up to a meet. This would probably mean that I wouldn't take a full day off.
+
+Secondly, I would make the conscious effort to get good sleep specifically for the 3 days preceding the first day of the meet and practicing good sleep hygiene like going to bed at a consistent time.
+
+Thirdly, as I am currently targeting 50/100s, I would focus on fewer, more intense sessions in the week leading up to the meet but there is no need to swim aerobically in the 3 days leading up.
+
+An interesting extra finding that I found in this analysis, is that swim number was a significant factor in all my models. This is interesting because most swimmers have this mindset that they are a "morning" swimmer or an "evening." However, whilst this was an important factor in 50 and 100 improvement prediction, there was no clear pattern that my first (morning) or last (evening) swimmers were any better for predicting PBs.
+
+
